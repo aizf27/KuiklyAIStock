@@ -1,6 +1,7 @@
 package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
+import com.example.kuiklyaistock.base.BridgeModule
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
@@ -77,6 +78,9 @@ internal class StockHomePage : BasePager() {
         val result = repository.getQuotes()
         quotes = result
         errorMessage = if (result.isEmpty()) "暂无行情数据" else ""
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
+            if (result.isEmpty()) "stock_home 行情加载为空" else "stock_home 行情加载成功: ${result.size}"
+        )
         loading = false
     }
 
@@ -85,6 +89,7 @@ internal class StockHomePage : BasePager() {
             put("code", code)
             put("symbol", code)
         }
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")
         acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("stock_detail", pageData)
     }
 }

@@ -1,6 +1,7 @@
 package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
+import com.example.kuiklyaistock.base.BridgeModule
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.AiAnalysis
 import com.example.kuiklyaistock.repository.MockStockRepository
@@ -153,12 +154,15 @@ internal class StockDetailPage : BasePager() {
         }
         if (code.isEmpty()) {
             errorMessage = "缺少股票代码，无法加载详情"
+            acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 缺少股票代码")
         } else {
             detail = repository.getDetail(code)
             if (detail == null) {
                 errorMessage = "未找到股票：$code"
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 未找到股票: $code")
             } else {
                 analysis = repository.getAiAnalysis(code)
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载成功: $code")
             }
         }
         loading = false
