@@ -22,6 +22,7 @@ internal class StockHomePage : BasePager() {
     private var loading by observable(true)
     private var quotes by observable(emptyList<StockQuote>())
     private var errorMessage by observable("")
+    private var selectedTab by observable(StockTabs.MARKET)
 
     override fun created() {
         super.created()
@@ -69,6 +70,12 @@ internal class StockHomePage : BasePager() {
                             ctx.openDetail(quote.code)
                         }
                     }
+                }
+            }
+            StockBottomBar(ctx.selectedTab) { tab ->
+                ctx.selectedTab = tab
+                if (tab == StockTabs.AI) {
+                    ctx.openStockPage("stock_ai")
                 }
             }
         }
