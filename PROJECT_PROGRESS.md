@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Task 1「AI 股票行情原型 Demo」主链路已实现，正在进行构建环境收尾验证。
+Task 1 重制计划阶段 1-5 已完成，等待审查后继续阶段 6-10。
 
 ## 已完成
 
@@ -16,6 +16,7 @@ Task 1「AI 股票行情原型 Demo」主链路已实现，正在进行构建环
 - [x] 实现独立 AI 分析区域：趋势判断、操作提示、风险提醒、信号解读、行情总结。
 - [x] Android 默认启动页切换为 `stock_home`，可选宿主目录按存在性加入 settings。
 - [x] 补充行情加载、详情加载失败/成功和列表跳转日志。
+- [x] 完成阶段 1-5：应用壳层、数据边界、共享组件、首页信息架构、行情与自选交互。
 
 ## 提交记录
 
@@ -27,10 +28,16 @@ Task 1「AI 股票行情原型 Demo」主链路已实现，正在进行构建环
 - `ade4a12` Task1 完善可选宿主配置并设置行情首页入口
 - `b4af18b` Task1 增加股票Repository回归测试
 - `a7a153c` Task1 补充行情链路关键调试日志
+- `1ffb876` Task1 阶段1 建立应用壳层与底部导航
+- `b776c82` Task1 阶段2 完善市场摘要与自选数据边界
+- `efd79e6` Task1 阶段3 统一股票通用UI组件
+- `b13996a` Task1 阶段4 完成行情首页信息架构
+- `253d311` Task1 阶段5 完成股票列表与自选交互
 
 ## 验证记录
 
 - `:shared:compileKotlinJs`：通过。
+- 阶段 3、阶段 5 修改后均执行 `:shared:compileKotlinJs`，通过。
 - Repository 单元测试已补充，覆盖 5 条稳定样本、详情/AI 查询和未知代码空结果。
 - `:shared:compileKotlinMetadata`：任务被当前目标配置跳过。
 - `:shared:compileKotlinJvm`：任务不存在，当前 shared 仅配置 JS/Android target。
