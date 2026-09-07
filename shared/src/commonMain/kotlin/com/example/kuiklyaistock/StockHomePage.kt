@@ -3,6 +3,7 @@ package com.example.kuiklyaistock
 import com.example.kuiklyaistock.base.BasePager
 import com.example.kuiklyaistock.base.BridgeModule
 import com.example.kuiklyaistock.model.StockQuote
+import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
 import com.tencent.kuikly.core.annotations.Page
@@ -21,6 +22,7 @@ internal class StockHomePage : BasePager() {
     private val repository: StockRepository = MockStockRepository()
     private var loading by observable(true)
     private var quotes by observable(emptyList<StockQuote>())
+    private var marketSummary by observable<MarketSummary?>(null)
     private var errorMessage by observable("")
     private var selectedTab by observable(StockTabs.MARKET)
 
@@ -32,6 +34,9 @@ internal class StockHomePage : BasePager() {
     override fun body(): ViewBuilder {
         val ctx = this
         return {
+            attr {
+                backgroundColor(Color(0xFFF8FAFC))
+            }
             RouterNavBar {
                 attr {
                     title = "AI 股票行情"
@@ -46,11 +51,11 @@ internal class StockHomePage : BasePager() {
                 Scroller {
                     attr {
                         flex(1f)
-                        padding(left = 16f, right = 16f, top = 12f, bottom = 20f)
+                        padding(left = 16f, right = 16f, top = 14f, bottom = 20f)
                     }
                     Text {
                         attr {
-                            text("自选行情")
+                            text("行情中心")
                             fontSize(24f)
                             fontWeightBold()
                             color(Color(0xFF1F2937))
@@ -59,10 +64,20 @@ internal class StockHomePage : BasePager() {
                     }
                     Text {
                         attr {
-                            text("实时 Mock 数据 · ${ctx.quotes.size} 只股票")
+                            text("盘中行情 · ${ctx.quotes.size} 只股票")
                             fontSize(13f)
                             color(Color(0xFF6B7280))
                             marginBottom(12f)
+                        }
+                        }
+                    StockMarketSummary(ctx.marketSummary)
+                    Text {
+                        attr {
+                            text("全部行情")
+                            fontSize(17f)
+                            fontWeightBold()
+                            color(Color(0xFF1F2937))
+                            marginBottom(10f)
                         }
                     }
                     ctx.quotes.forEach { quote ->
@@ -84,6 +99,7 @@ internal class StockHomePage : BasePager() {
     private fun loadQuotes() {
         val result = repository.getQuotes()
         quotes = result
+        marketSummary = repository.getMarketSummary()
         errorMessage = if (result.isEmpty()) "暂无行情数据" else ""
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
             if (result.isEmpty()) "stock_home 行情加载为空" else "stock_home 行情加载成功: ${result.size}"
