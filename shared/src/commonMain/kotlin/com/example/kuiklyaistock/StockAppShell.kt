@@ -24,8 +24,6 @@ internal fun ViewContainer<*, *>.StockBottomBar(
             height(64f)
             backgroundColor(Color.WHITE)
             flexDirectionRow()
-            borderTopWidth(1f)
-            borderTopColor(Color(0xFFE5E7EB))
         }
         StockTabItem(StockTabs.MARKET, selectedTab == StockTabs.MARKET, onTabSelected)
         StockTabItem(StockTabs.WATCHLIST, selectedTab == StockTabs.WATCHLIST, onTabSelected)

@@ -39,9 +39,9 @@ internal class StockHomePage : BasePager() {
                 }
             }
             if (ctx.loading) {
-                StateText("正在加载行情...")
+                StockStateText("正在加载行情...")
             } else if (ctx.errorMessage.isNotEmpty()) {
-                StateText(ctx.errorMessage)
+                StockStateText(ctx.errorMessage)
             } else {
                 Scroller {
                     attr {
@@ -100,90 +100,3 @@ internal class StockHomePage : BasePager() {
         acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("stock_detail", pageData)
     }
 }
-
-private fun ViewContainer<*, *>.StockQuoteRow(quote: StockQuote, onClick: () -> Unit) {
-    val changeColor = if (quote.change >= 0) Color(0xFFE53E3E) else Color(0xFF16A34A)
-    View {
-        attr {
-            backgroundColor(Color.WHITE)
-            borderRadius(8f)
-            padding(left = 14f, right = 14f, top = 14f, bottom = 14f)
-            marginBottom(10f)
-        }
-        event {
-            click { onClick() }
-        }
-        View {
-            attr {
-                flexDirectionRow()
-                alignItemsCenter()
-            }
-            View {
-                attr {
-                    flex(1f)
-                }
-                Text {
-                    attr {
-                        text(quote.name)
-                        fontSize(17f)
-                        fontWeightBold()
-                        color(Color(0xFF111827))
-                    }
-                }
-                Text {
-                    attr {
-                        text(quote.code)
-                        fontSize(12f)
-                        color(Color(0xFF6B7280))
-                        marginTop(4f)
-                    }
-                }
-            }
-            View {
-                attr {
-                    width(92f)
-                    alignItemsFlexEnd()
-                }
-                Text {
-                    attr {
-                        text(formatPrice(quote.price))
-                        fontSize(18f)
-                        fontWeightBold()
-                        color(Color(0xFF111827))
-                    }
-                }
-                Text {
-                    attr {
-                        text("${formatSigned(quote.change)}  ${formatPercent(quote.changePercent)}")
-                        fontSize(12f)
-                        color(changeColor)
-                        marginTop(4f)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun ViewContainer<*, *>.StateText(message: String) {
-    View {
-        attr {
-            flex(1f)
-            allCenter()
-            padding(20f)
-        }
-        Text {
-            attr {
-                text(message)
-                fontSize(15f)
-                color(Color(0xFF6B7280))
-            }
-        }
-    }
-}
-
-private fun formatPrice(value: Double): String = value.toString()
-
-private fun formatSigned(value: Double): String = if (value >= 0) "+${formatPrice(value)}" else formatPrice(value)
-
-private fun formatPercent(value: Double): String = if (value >= 0) "+${formatPrice(value)}%" else "${formatPrice(value)}%"

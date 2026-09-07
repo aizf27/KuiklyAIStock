@@ -39,9 +39,9 @@ internal class StockDetailPage : BasePager() {
                 }
             }
             if (ctx.loading) {
-                DetailStateText("正在加载详情...")
+                StockStateText("正在加载详情...")
             } else if (ctx.errorMessage.isNotEmpty()) {
-                DetailStateText(ctx.errorMessage)
+                StockStateText(ctx.errorMessage)
             } else {
                 ctx.detail?.let { stock ->
                     Scroller {
@@ -74,7 +74,7 @@ internal class StockDetailPage : BasePager() {
                             }
                             Text {
                                 attr {
-                                    text(formatPrice(stock.quote.price))
+                                    text(formatStockPrice(stock.quote.price))
                                     fontSize(32f)
                                     fontWeightBold()
                                     color(Color(0xFF111827))
@@ -82,9 +82,9 @@ internal class StockDetailPage : BasePager() {
                             }
                             Text {
                                 attr {
-                                    text("${formatSigned(stock.quote.change)}  ${formatPercent(stock.quote.changePercent)}")
+                                    text("${formatStockSigned(stock.quote.change)}  ${formatStockPercent(stock.quote.changePercent)}")
                                     fontSize(15f)
-                                    color(changeColor(stock.quote.change))
+                                    color(stockChangeColor(stock.quote.change))
                                     marginTop(6f)
                                 }
                             }
@@ -136,10 +136,10 @@ internal class StockDetailPage : BasePager() {
                             attr {
                                 flexDirectionRow()
                             }
-                            Metric("最高", formatPrice(stock.high))
-                            Metric("最低", formatPrice(stock.low))
-                            Metric("成交量", formatVolume(stock.volume))
-                            Metric("成交额", formatTurnover(stock.turnover))
+                            StockMetric("最高", formatStockPrice(stock.high))
+                            StockMetric("最低", formatStockPrice(stock.low))
+                            StockMetric("成交量", formatStockVolume(stock.volume))
+                            StockMetric("成交额", formatStockTurnover(stock.turnover))
                         }
                         AiAnalysisSection(ctx.analysis)
                     }
@@ -168,57 +168,3 @@ internal class StockDetailPage : BasePager() {
         loading = false
     }
 }
-
-private fun ViewContainer<*, *>.Metric(label: String, value: String) {
-    View {
-        attr {
-            width(50f)
-            marginRight(20f)
-            marginBottom(14f)
-        }
-        Text {
-            attr {
-                text(label)
-                fontSize(12f)
-                color(Color(0xFF6B7280))
-            }
-        }
-        Text {
-            attr {
-                text(value)
-                fontSize(15f)
-                color(Color(0xFF111827))
-                marginTop(4f)
-            }
-        }
-    }
-}
-
-private fun ViewContainer<*, *>.DetailStateText(message: String) {
-    View {
-        attr {
-            flex(1f)
-            allCenter()
-            padding(20f)
-        }
-        Text {
-            attr {
-                text(message)
-                fontSize(15f)
-                color(Color(0xFF6B7280))
-            }
-        }
-    }
-}
-
-private fun changeColor(change: Double): Color = if (change >= 0) Color(0xFFE53E3E) else Color(0xFF16A34A)
-
-private fun formatPrice(value: Double): String = value.toString()
-
-private fun formatSigned(value: Double): String = if (value >= 0) "+${formatPrice(value)}" else formatPrice(value)
-
-private fun formatPercent(value: Double): String = if (value >= 0) "+${formatPrice(value)}%" else "${formatPrice(value)}%"
-
-private fun formatVolume(value: Long): String = if (value >= 10_000_000) "${value / 10_000_000.0}千万" else "${value / 10_000.0}万"
-
-private fun formatTurnover(value: Double): String = if (value >= 100_000_000) "${value / 100_000_000.0}亿" else "${value / 10_000.0}万"
