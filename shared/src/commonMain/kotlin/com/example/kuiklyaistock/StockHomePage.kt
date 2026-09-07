@@ -11,8 +11,6 @@ import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
-import com.tencent.kuikly.core.module.RouterModule
-import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
@@ -125,12 +123,8 @@ internal class StockHomePage : BasePager() {
     }
 
     private fun openDetail(code: String) {
-        val pageData = JSONObject().apply {
-            put("code", code)
-            put("symbol", code)
-        }
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")
-        acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("stock_detail", pageData)
+        openStockPage("stock_detail", code)
     }
 
     private fun currentQuotes(): List<StockQuote> {

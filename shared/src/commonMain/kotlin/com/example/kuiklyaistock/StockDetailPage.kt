@@ -6,6 +6,7 @@ import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.AiAnalysis
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
+import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -24,6 +25,7 @@ internal class StockDetailPage : BasePager() {
     private var detail by observable<StockDetail?>(null)
     private var analysis by observable<AiAnalysis?>(null)
     private var errorMessage by observable("")
+    private var favoriteVersion by observable(0)
 
     override fun created() {
         super.created()
@@ -33,6 +35,9 @@ internal class StockDetailPage : BasePager() {
     override fun body(): ViewBuilder {
         val ctx = this
         return {
+            attr {
+                backgroundColor(Color(0xFFF8FAFC))
+            }
             RouterNavBar {
                 attr {
                     title = ctx.detail?.quote?.name ?: "股票详情"
@@ -49,21 +54,45 @@ internal class StockDetailPage : BasePager() {
                             flex(1f)
                             padding(left = 16f, right = 16f, top = 14f, bottom = 24f)
                         }
-                        Text {
+                        View {
                             attr {
-                                text(stock.quote.name)
-                                fontSize(24f)
-                                fontWeightBold()
-                                color(Color(0xFF111827))
-                            }
-                        }
-                        Text {
-                            attr {
-                                text("${stock.quote.code}  ·  ${stock.quote.updatedAt}")
-                                fontSize(12f)
-                                color(Color(0xFF6B7280))
-                                marginTop(5f)
+                                flexDirectionRow()
+                                alignItemsCenter()
                                 marginBottom(14f)
+                            }
+                            View {
+                                attr {
+                                    flex(1f)
+                                }
+                                Text {
+                                    attr {
+                                        text(stock.quote.name)
+                                        fontSize(24f)
+                                        fontWeightBold()
+                                        color(Color(0xFF111827))
+                                    }
+                                }
+                                Text {
+                                    attr {
+                                        text("${stock.quote.code} · ${stock.quote.updatedAt}")
+                                        fontSize(12f)
+                                        color(Color(0xFF6B7280))
+                                        marginTop(5f)
+                                    }
+                                }
+                            }
+                            Text {
+                                attr {
+                                    text(if (ctx.isFavorite(stock.quote.code)) "★" else "☆")
+                                    fontSize(28f)
+                                    color(
+                                        if (ctx.isFavorite(stock.quote.code)) Color(0xFFF59E0B)
+                                        else Color(0xFF9CA3AF)
+                                    )
+                                }
+                                event {
+                                    click { ctx.toggleFavorite(stock.quote.code) }
+                                }
                             }
                         }
                         View {
@@ -135,6 +164,9 @@ internal class StockDetailPage : BasePager() {
                         View {
                             attr {
                                 flexDirectionRow()
+                                backgroundColor(Color.WHITE)
+                                borderRadius(8f)
+                                padding(left = 14f, right = 14f, top = 14f, bottom = 4f)
                             }
                             StockMetric("最高", formatStockPrice(stock.high))
                             StockMetric("最低", formatStockPrice(stock.low))
@@ -151,7 +183,7 @@ internal class StockDetailPage : BasePager() {
     private fun loadDetail() {
         val code = pagerData.params.optString("code").ifEmpty {
             pagerData.params.optString("symbol")
-        }
+        }.trim()
         if (code.isEmpty()) {
             errorMessage = "缺少股票代码，无法加载详情"
             acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 缺少股票代码")
@@ -166,5 +198,18 @@ internal class StockDetailPage : BasePager() {
             }
         }
         loading = false
+    }
+
+    private fun isFavorite(code: String): Boolean {
+        favoriteVersion
+        return WatchlistStore.isFavorite(code)
+    }
+
+    private fun toggleFavorite(code: String) {
+        val favorite = WatchlistStore.toggle(code)
+        favoriteVersion += 1
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
+            "stock_detail 自选${if (favorite) "添加" else "移除"}: $code"
+        )
     }
 }
