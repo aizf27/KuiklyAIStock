@@ -99,9 +99,9 @@ internal class StockAiPage : BasePager() {
             }
             StockBottomBar(StockTabs.AI) { tab ->
                 if (tab == StockTabs.MARKET) {
-                    ctx.openStockPage("stock_home")
+                    ctx.openStockPage("stock_home", selectedTab = StockTabs.MARKET)
                 } else if (tab == StockTabs.WATCHLIST) {
-                    ctx.openStockPage("stock_home")
+                    ctx.openStockPage("stock_home", selectedTab = StockTabs.WATCHLIST)
                 }
             }
         }

@@ -30,7 +30,7 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
         AnalysisCard("趋势判断", analysis.trendJudgement, Color(0xFFEFF6FF))
         AnalysisCard("操作提示", analysis.operationTip, Color(0xFFF0FDF4))
         AnalysisCard("风险提醒", analysis.riskReminder, Color(0xFFFFF7ED))
-        AnalysisCard("信号解读", analysis.signalInterpretation, Color(0xFFF5F3FF))
+        AnalysisCard("信号解读", analysis.signalInterpretation, Color(0xFFF3F4F6))
         AnalysisCard("行情总结", analysis.marketSummary, Color(0xFFF8FAFC))
     }
 }

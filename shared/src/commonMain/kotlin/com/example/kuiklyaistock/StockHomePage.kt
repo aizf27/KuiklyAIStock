@@ -28,6 +28,7 @@ internal class StockHomePage : BasePager() {
 
     override fun created() {
         super.created()
+        selectedTab = StockTabs.fromRoute(pagerData.params.optString("selectedTab"))
         loadQuotes()
     }
 
@@ -103,9 +104,10 @@ internal class StockHomePage : BasePager() {
                 }
             }
             StockBottomBar(ctx.selectedTab) { tab ->
-                ctx.selectedTab = tab
-                if (tab == StockTabs.AI) {
+                if (tab == StockTabs.AI && ctx.selectedTab != StockTabs.AI) {
                     ctx.openStockPage("stock_ai")
+                } else {
+                    ctx.selectedTab = tab
                 }
             }
         }
