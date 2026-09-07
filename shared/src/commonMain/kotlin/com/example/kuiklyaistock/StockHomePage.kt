@@ -47,7 +47,7 @@ internal class StockHomePage : BasePager() {
             if (ctx.loading) {
                 StockStateText("正在加载行情...")
             } else if (ctx.errorMessage.isNotEmpty()) {
-                StockStateText(ctx.errorMessage)
+                StockStateText(ctx.errorMessage, "重新加载") { ctx.loadQuotes() }
             } else {
                 val visibleQuotes = ctx.currentQuotes()
                 Scroller {
@@ -114,6 +114,7 @@ internal class StockHomePage : BasePager() {
     }
 
     private fun loadQuotes() {
+        loading = true
         val result = repository.getQuotes()
         quotes = result
         marketSummary = repository.getMarketSummary()

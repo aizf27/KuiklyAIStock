@@ -5,12 +5,20 @@ import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 // 统一股票涨跌颜色，避免不同页面出现相反的颜色规则。
 internal fun stockChangeColor(change: Double): Color =
     if (change > 0) Color(0xFFE53E3E) else if (change < 0) Color(0xFF16A34A) else Color(0xFF6B7280)
 
-internal fun formatStockPrice(value: Double): String = value.toString()
+internal fun formatStockPrice(value: Double): String {
+    val scaled = (value * 100).roundToLong()
+    val absolute = abs(scaled)
+    val decimals = absolute % 100
+    val sign = if (scaled < 0) "-" else ""
+    return "$sign${absolute / 100}.${if (decimals < 10) "0$decimals" else decimals}"
+}
 
 internal fun formatStockSigned(value: Double): String =
     if (value > 0) "+${formatStockPrice(value)}" else formatStockPrice(value)
@@ -78,6 +86,15 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
                     }
                 }
             }
+            Text {
+                attr {
+                    text(if (quote.isRising) "↗" else if (quote.isFalling) "↘" else "→")
+                    fontSize(20f)
+                    fontWeightBold()
+                    color(stockChangeColor(quote.change))
+                    marginRight(10f)
+                }
+            }
             View {
                 attr {
                     width(92f)
@@ -129,7 +146,11 @@ internal fun ViewContainer<*, *>.StockMetric(label: String, value: String) {
     }
 }
 
-internal fun ViewContainer<*, *>.StockStateText(message: String) {
+internal fun ViewContainer<*, *>.StockStateText(
+    message: String,
+    actionTitle: String = "",
+    onAction: () -> Unit = {},
+) {
     View {
         attr {
             flex(1f)
@@ -141,6 +162,20 @@ internal fun ViewContainer<*, *>.StockStateText(message: String) {
                 text(message)
                 fontSize(15f)
                 color(Color(0xFF6B7280))
+            }
+        }
+        if (actionTitle.isNotEmpty()) {
+            Text {
+                attr {
+                    text(actionTitle)
+                    fontSize(14f)
+                    fontWeightBold()
+                    color(Color(0xFF2563EB))
+                    marginTop(14f)
+                }
+                event {
+                    click { onAction() }
+                }
             }
         }
     }
