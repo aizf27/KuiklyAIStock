@@ -52,3 +52,18 @@ data class AiAnalysis(
     val signalInterpretation: String,
     val marketSummary: String,
 )
+
+// AI 解读首页的市场级结论。
+data class AiMarketOverview(
+    val title: String,
+    val sentiment: String,
+    val summary: String,
+    val riskTip: String,
+    val updatedAt: String,
+)
+
+// AI 解读首页的重点股票卡片数据。
+data class AiStockInsight(
+    val quote: StockQuote,
+    val analysis: AiAnalysis,
+)

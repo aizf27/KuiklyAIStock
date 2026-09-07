@@ -1,6 +1,8 @@
 package com.example.kuiklyaistock.repository
 
 import com.example.kuiklyaistock.model.AiAnalysis
+import com.example.kuiklyaistock.model.AiMarketOverview
+import com.example.kuiklyaistock.model.AiStockInsight
 import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.StockQuote
@@ -12,6 +14,8 @@ interface StockRepository {
     fun getMarketSummary(): MarketSummary
     fun getDetail(code: String): StockDetail?
     fun getAiAnalysis(code: String): AiAnalysis?
+    fun getAiMarketOverview(): AiMarketOverview
+    fun getAiInsights(): List<AiStockInsight>
 }
 
 // 第一阶段使用的确定性本地数据。
@@ -136,6 +140,20 @@ class MockStockRepository : StockRepository {
     }
 
     override fun getAiAnalysis(code: String): AiAnalysis? = analyses[code.trim()]
+
+    override fun getAiMarketOverview(): AiMarketOverview = AiMarketOverview(
+        title = "震荡中结构性机会占优",
+        sentiment = "谨慎乐观",
+        summary = "样本股票中科技与新能源方向表现较强，权重消费和金融仍处于整理阶段。",
+        riskTip = "关注高位波动、板块轮动加快和成交量回落风险。",
+        updatedAt = "2026-09-07 15:00",
+    )
+
+    override fun getAiInsights(): List<AiStockInsight> = details.mapNotNull { detail ->
+        analyses[detail.quote.code]?.let { analysis ->
+            AiStockInsight(detail.quote, analysis)
+        }
+    }
 
     private fun stock(
         name: String,
