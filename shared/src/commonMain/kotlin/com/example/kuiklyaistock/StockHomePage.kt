@@ -6,6 +6,7 @@ import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
+import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -25,6 +26,7 @@ internal class StockHomePage : BasePager() {
     private var marketSummary by observable<MarketSummary?>(null)
     private var errorMessage by observable("")
     private var selectedTab by observable(StockTabs.MARKET)
+    private var favoriteVersion by observable(0)
 
     override fun created() {
         super.created()
@@ -48,6 +50,7 @@ internal class StockHomePage : BasePager() {
             } else if (ctx.errorMessage.isNotEmpty()) {
                 StockStateText(ctx.errorMessage)
             } else {
+                val visibleQuotes = ctx.currentQuotes()
                 Scroller {
                     attr {
                         flex(1f)
@@ -64,7 +67,7 @@ internal class StockHomePage : BasePager() {
                     }
                     Text {
                         attr {
-                            text("盘中行情 · ${ctx.quotes.size} 只股票")
+                            text("盘中行情 · ${visibleQuotes.size} 只股票")
                             fontSize(13f)
                             color(Color(0xFF6B7280))
                             marginBottom(12f)
@@ -73,16 +76,30 @@ internal class StockHomePage : BasePager() {
                     StockMarketSummary(ctx.marketSummary)
                     Text {
                         attr {
-                            text("全部行情")
+                            text(if (ctx.selectedTab == StockTabs.WATCHLIST) "自选股票" else "全部行情")
                             fontSize(17f)
                             fontWeightBold()
                             color(Color(0xFF1F2937))
                             marginBottom(10f)
                         }
                     }
-                    ctx.quotes.forEach { quote ->
-                        StockQuoteRow(quote) {
-                            ctx.openDetail(quote.code)
+                    if (visibleQuotes.isEmpty()) {
+                        Text {
+                            attr {
+                                text("暂无自选股票，点击行情中的星标添加")
+                                fontSize(14f)
+                                color(Color(0xFF6B7280))
+                                marginTop(20f)
+                            }
+                        }
+                    } else {
+                        visibleQuotes.forEach { quote ->
+                            StockQuoteRow(
+                                quote = quote,
+                                favorite = WatchlistStore.isFavorite(quote.code),
+                                onFavorite = { ctx.toggleFavorite(quote.code) },
+                                onClick = { ctx.openDetail(quote.code) },
+                            )
                         }
                     }
                 }
@@ -114,5 +131,22 @@ internal class StockHomePage : BasePager() {
         }
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")
         acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("stock_detail", pageData)
+    }
+
+    private fun currentQuotes(): List<StockQuote> {
+        favoriteVersion
+        return if (selectedTab == StockTabs.WATCHLIST) {
+            WatchlistStore.filterFavorite(quotes)
+        } else {
+            quotes
+        }
+    }
+
+    private fun toggleFavorite(code: String) {
+        val favorite = WatchlistStore.toggle(code)
+        favoriteVersion += 1
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
+            "stock_home 自选${if (favorite) "添加" else "移除"}: $code"
+        )
     }
 }
