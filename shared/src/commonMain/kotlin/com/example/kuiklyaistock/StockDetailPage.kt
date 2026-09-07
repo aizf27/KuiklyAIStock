@@ -2,6 +2,7 @@ package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
 import com.example.kuiklyaistock.model.StockDetail
+import com.example.kuiklyaistock.model.AiAnalysis
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
 import com.tencent.kuikly.core.annotations.Page
@@ -20,6 +21,7 @@ internal class StockDetailPage : BasePager() {
     private val repository: StockRepository = MockStockRepository()
     private var loading by observable(true)
     private var detail by observable<StockDetail?>(null)
+    private var analysis by observable<AiAnalysis?>(null)
     private var errorMessage by observable("")
 
     override fun created() {
@@ -138,6 +140,7 @@ internal class StockDetailPage : BasePager() {
                             Metric("成交量", formatVolume(stock.volume))
                             Metric("成交额", formatTurnover(stock.turnover))
                         }
+                        AiAnalysisSection(ctx.analysis)
                     }
                 }
             }
@@ -154,6 +157,8 @@ internal class StockDetailPage : BasePager() {
             detail = repository.getDetail(code)
             if (detail == null) {
                 errorMessage = "未找到股票：$code"
+            } else {
+                analysis = repository.getAiAnalysis(code)
             }
         }
         loading = false
