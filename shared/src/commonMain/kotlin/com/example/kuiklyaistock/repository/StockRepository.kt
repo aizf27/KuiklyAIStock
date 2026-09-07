@@ -1,6 +1,7 @@
 package com.example.kuiklyaistock.repository
 
 import com.example.kuiklyaistock.model.AiAnalysis
+import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.TrendPoint
@@ -8,6 +9,7 @@ import com.example.kuiklyaistock.model.TrendPoint
 // 股票数据仓库，后续可替换为真实行情服务。
 interface StockRepository {
     fun getQuotes(): List<StockQuote>
+    fun getMarketSummary(): MarketSummary
     fun getDetail(code: String): StockDetail?
     fun getAiAnalysis(code: String): AiAnalysis?
 }
@@ -116,6 +118,17 @@ class MockStockRepository : StockRepository {
     )
 
     override fun getQuotes(): List<StockQuote> = details.map { it.quote }
+
+    override fun getMarketSummary(): MarketSummary {
+        val quotes = getQuotes()
+        return MarketSummary(
+            totalCount = quotes.size,
+            risingCount = quotes.count { it.isRising },
+            fallingCount = quotes.count { it.isFalling },
+            flatCount = quotes.count { !it.isRising && !it.isFalling },
+            updatedAt = quotes.firstOrNull()?.updatedAt.orEmpty(),
+        )
+    }
 
     override fun getDetail(code: String): StockDetail? {
         val normalized = code.trim()

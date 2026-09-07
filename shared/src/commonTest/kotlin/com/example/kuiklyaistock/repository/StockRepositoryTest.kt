@@ -31,6 +31,16 @@ class StockRepositoryTest {
     }
 
     @Test
+    fun calculatesMarketSummary() {
+        val summary = repository.getMarketSummary()
+
+        assertEquals(5, summary.totalCount)
+        assertEquals(3, summary.risingCount)
+        assertEquals(2, summary.fallingCount)
+        assertEquals(0, summary.flatCount)
+    }
+
+    @Test
     fun returnsNullForUnknownCode() {
         assertNull(repository.getDetail("UNKNOWN"))
         assertNull(repository.getAiAnalysis("UNKNOWN"))
