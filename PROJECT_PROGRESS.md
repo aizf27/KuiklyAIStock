@@ -28,8 +28,10 @@ Task 1「AI 股票行情原型 Demo」主链路已实现，正在进行构建环
 ## 验证记录
 
 - `:shared:compileKotlinJs`：通过。
+- Repository 单元测试已补充，覆盖 5 条稳定样本、详情/AI 查询和未知代码空结果。
 - `:shared:compileKotlinMetadata`：任务被当前目标配置跳过。
 - `:shared:compileKotlinJvm`：任务不存在，当前 shared 仅配置 JS/Android target。
+- `:shared:jsTest`：测试编译阶段触发 Kuikly/Kotlin IR 内部错误（`IrSimpleFunctionSymbolImpl is already bound`），未进入断言执行。
 - `:androidApp:assembleDebug`：D8 转换 Kuikly/Kotlin 依赖失败，报 `Error while dexing`；另有 AGP 7.4.2 与 compileSdk 34 的环境警告。
 
 ## 下一步
