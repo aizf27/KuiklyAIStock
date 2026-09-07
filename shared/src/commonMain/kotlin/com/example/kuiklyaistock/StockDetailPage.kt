@@ -13,7 +13,6 @@ import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import com.tencent.kuikly.core.reactive.handler.observable
-import com.tencent.kuikly.core.views.Canvas
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
@@ -128,29 +127,11 @@ internal class StockDetailPage : BasePager() {
                                 marginBottom(8f)
                             }
                         }
-                        Canvas({
-                            attr {
-                                size(ctx.pagerData.pageViewWidth - 32f, 180f)
-                            }
-                        }) { context, _, _ ->
-                            val values = stock.trend.map { it.price }
-                            if (values.isNotEmpty()) {
-                                val min = values.minOrNull() ?: 0.0
-                                val max = values.maxOrNull() ?: 1.0
-                                val range = (max - min).takeIf { it > 0 } ?: 1.0
-                                val chartWidth = ctx.pagerData.pageViewWidth - 48f
-                                val chartHeight = 156f
-                                context.beginPath()
-                                values.forEachIndexed { index, value ->
-                                    val x = 8f + chartWidth * index / (values.size - 1).coerceAtLeast(1)
-                                    val y = 12f + chartHeight * (1f - ((value - min) / range).toFloat())
-                                    if (index == 0) context.moveTo(x, y) else context.lineTo(x, y)
-                                }
-                                context.strokeStyle(Color(0xFFE53E3E))
-                                context.lineWidth(3f)
-                                context.stroke()
-                            }
-                        }
+                        StockTrendChart(
+                            points = stock.trend,
+                            width = ctx.pagerData.pageViewWidth - 32f,
+                            change = stock.quote.change,
+                        )
                         Text {
                             attr {
                                 text("基础行情")
