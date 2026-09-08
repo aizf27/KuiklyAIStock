@@ -10,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.math.abs
 
 class StockRepositoryTest {
     private val repository = MockStockRepository(delayMillis = 0)
@@ -39,6 +40,24 @@ class StockRepositoryTest {
         assertTrue(data.analysis.factSummary.isNotEmpty())
         assertTrue(data.analysis.evidenceSummary.isNotEmpty())
         assertTrue(data.analysis.isDemo)
+    }
+
+    @Test
+    fun keepsQuoteChangeAndPercentConsistent() {
+        val home = assertIs<StockLoadResult.Success<StockHomeData>>(
+            runImmediate { repository.loadHome(testScope) }
+        ).data
+
+        home.quotes.forEach { quote ->
+            val detail = assertIs<StockLoadResult.Success<StockDetailData>>(
+                runImmediate { repository.loadDetail(testScope, quote.code) }
+            ).data.detail
+            val expectedChange = detail.quote.price - detail.previousClose
+            val expectedPercent = expectedChange / detail.previousClose * 100
+
+            assertTrue(abs(detail.quote.change - expectedChange) < 0.0001)
+            assertTrue(abs(detail.quote.changePercent - expectedPercent) < 0.01)
+        }
     }
 
     @Test

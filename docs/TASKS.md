@@ -33,7 +33,8 @@
 - [x] 重构详情页价格层级、关键行情网格与分时/日K 双周期走势。
 - [x] 重构 AI 页面和详情 AI 区，明确事实、观点、依据、适用周期、风险和演示边界。
 - [x] 补充 Repository 回归测试，覆盖新增市场、走势与 AI 数据字段。
-- [ ] 在可联网且可写 Gradle 缓存的环境执行 `:shared:compileKotlinJs` 与 Android 真机视觉验收。
+- [x] 使用项目内 Gradle 缓存完成 `:shared:compileKotlinJs` 与 `:shared:compileTestKotlinJs`。
+- [ ] 完成 Android 真机的返回栈、360x800、长文本、空数据和失败重试视觉验收。
 
 ### UI P0 明确延期
 
@@ -84,7 +85,7 @@
 - 核心价格区展示最新价、涨跌额、涨跌幅、更新时间。
 - 指标区展示最高价、最低价、成交量、成交额等基础行情。
 - 走势区至少提供一张可读的分时/近 7 日折线图，带时间刻度、价格范围和当前点信息。
-- 详情页无 `code`/`symbol`、代码不存在、数据为空时均有明确状态，不显示空白页面。
+- 详情页缺少 `code`、代码不存在或数据为空时均有明确状态，不显示空白页面。
 
 #### 4. AI 分析与解读
 
@@ -98,7 +99,7 @@
 - 统一股票模型、走势模型、AI 分析模型和自选状态模型。
 - 统一 Repository 接口与 Mock 实现，页面不得重复写股票数据。
 - 统一导航、卡片、涨跌颜色、指标单元格、状态视图和走势图组件。
-- 统一通过 `RouterModule` 传递 `code`/`symbol`，Task 2 直接复用详情页和 Repository。
+- 统一通过 `RouterModule` 传递 `code`，Task 2 直接复用详情页和 Repository。
 
 ### 三、页面结构草图
 
@@ -188,7 +189,7 @@ stock_detail
 
 状态：已完成（提交 `bb6ca43`）
 
-- 注册 `stock_detail`，从 `pagerData.params` 读取 `code`/`symbol`。
+- 注册 `stock_detail`，从 `pagerData.params` 读取 `code`。
 - 接入返回、自选按钮和详情数据查询，完成价格区与指标区。
 - 验收：从首页和 AI 解读入口进入同一详情页；正确代码显示正确股票，缺失/未知代码显示错误态。
 - 提交：`Task1 完成股票详情路由与基础行情`。
@@ -235,7 +236,7 @@ stock_detail
 - [x] 启动后进入完整行情首页，底部导航可用且选中态明确。
 - [x] 行情、自选、AI 解读三个 Tab 均有可见内容和合理空状态。
 - [x] 行情列表至少展示 5 只股票，字段完整，支持滚动和星标操作。
-- [x] 点击股票整行进入详情，路由携带 `code` 或 `symbol`。
+- [x] 点击股票整行进入详情，路由仅携带 `code`。
 - [x] 详情页展示价格、涨跌、最高、最低、成交量、成交额和可读走势。
 - [x] 详情页有独立 AI 区域，展示趋势、操作、风险、总结四类信息。
 - [x] 无效参数、空数据、加载中和错误状态均有可识别反馈。
@@ -278,7 +279,7 @@ Task 1
 ### 1. 模型契约
 
 - 定义股票报价、股票详情、走势点和 AI 分析的数据结构。
-- 统一使用 `code` 作为详情定位字段，必要时兼容 `symbol`。
+- 统一使用 `code` 作为详情定位字段，不保留同义 `symbol` 别名。
 - 产出：可被列表页、详情页和后续 Task 2 复用的共享 Model。
 
 ### 2. Mock 数据与 Repository
@@ -299,7 +300,7 @@ Task 1
 - 每行展示股票名称、代码、最新价、涨跌额和涨跌幅。
 - 红涨绿跌或其他颜色规则保持全局统一。
 - 支持列表滚动和点击整行。
-- 使用 `RouterModule.openPage("stock_detail", pageData)` 传递股票 `code`/`symbol`。
+- 使用 `RouterModule.openPage("stock_detail", pageData)` 传递股票 `code`。
 
 ### 5. `stock_detail` 页面
 
@@ -324,13 +325,14 @@ Task 1
 
 - [x] 存在可被 Kuikly 注册的 `stock_home` 和 `stock_detail` 页面，页面继承 `BasePager`。
 - [x] `stock_home` 能滚动展示至少五只确定性 Mock 股票，并显示名称、代码、价格、涨跌额、涨跌幅。
-- [x] 点击任意股票后，通过 `RouterModule` 携带 `code` 或 `symbol` 进入对应详情页。
+- [x] 点击任意股票后，通过 `RouterModule` 携带 `code` 进入对应详情页。
 - [x] `stock_detail` 能根据路由参数展示正确股票的基础行情和至少一个走势区域。
 - [x] 详情页有独立 AI 分析区域，同时展示趋势判断、操作提示、风险提醒和行情总结四类信息。
 - [x] 加载、空数据和无效参数均有可识别反馈，状态字段使用 `observable` 驱动 UI 更新。
 - [x] 页面和业务模型位于 `shared/src/commonMain`，未引入 Android Compose、Fragment 或 ViewModel。
 - [x] Mock 数据不依赖网络且结果稳定；Task 2 可复用模型、Repository、详情页和通用组件。
-- [ ] 执行 `:shared:compileKotlinJvm`，条件允许时执行 `:androidApp:assembleDebug`；代码变更经过 `git diff` 检查且无无关修改。
+- [x] `:shared:compileKotlinJs` 与 `:shared:compileTestKotlinJs` 通过，代码变更经过 `git diff --check` 检查。
+- [ ] `:shared:jsTest` 仍受 Kuikly/Kotlin JS IR 重复符号绑定错误阻塞；Android 构建仍受 D8 `Error while dexing` 阻塞，真机验收待完成。
 
 ### Task 1 暂不包含
 

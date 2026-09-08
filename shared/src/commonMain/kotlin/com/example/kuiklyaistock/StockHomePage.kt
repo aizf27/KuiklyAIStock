@@ -9,6 +9,7 @@ import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockLoadResult
+import com.example.kuiklyaistock.repository.StockRequestTracker
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -30,7 +31,7 @@ internal class StockHomePage : BasePager() {
     private var favoriteCodes by observable(emptySet<String>())
     private var selectedTab by observable(StockTabs.MARKET)
     private var removeWatchlistObserver: (() -> Unit)? = null
-    private var contentRequestId = 0
+    private val contentRequests = StockRequestTracker()
 
     override fun created() {
         super.created()
@@ -39,7 +40,7 @@ internal class StockHomePage : BasePager() {
     }
 
     override fun onDestroyPager() {
-        contentRequestId++
+        contentRequests.invalidate()
         removeWatchlistObserver?.invoke()
         removeWatchlistObserver = null
         super.onDestroyPager()
@@ -85,13 +86,16 @@ internal class StockHomePage : BasePager() {
     }
 
     private fun loadContent() {
-        val requestId = ++contentRequestId
+        val requestId = contentRequests.next()
         loading = true
         errorMessage = ""
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 开始加载: $requestId")
         lifecycleScope.launch {
             val homeResult = repository.loadHome(this)
-            if (requestId != contentRequestId) return@launch
+            if (!contentRequests.isLatest(requestId)) {
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 丢弃过期行情结果: $requestId")
+                return@launch
+            }
             when (homeResult) {
                 is StockLoadResult.Success -> {
                     quotes = homeResult.data.quotes
@@ -102,7 +106,10 @@ internal class StockHomePage : BasePager() {
             }
 
             val aiResult = repository.loadAi(this)
-            if (requestId != contentRequestId) return@launch
+            if (!contentRequests.isLatest(requestId)) {
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 丢弃过期AI结果: $requestId")
+                return@launch
+            }
             when (aiResult) {
                 is StockLoadResult.Success -> {
                     overview = aiResult.data.overview

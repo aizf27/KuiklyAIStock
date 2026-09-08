@@ -7,6 +7,7 @@ import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockLoadResult
+import com.example.kuiklyaistock.repository.StockRequestTracker
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -26,7 +27,7 @@ internal class StockDetailPage : BasePager() {
     private var favoriteCodes by observable(emptySet<String>())
     private var selectedChartPeriod by observable(StockChartPeriod.INTRADAY)
     private var removeWatchlistObserver: (() -> Unit)? = null
-    private var detailRequestId = 0
+    private val detailRequests = StockRequestTracker()
 
     override fun created() {
         super.created()
@@ -35,7 +36,7 @@ internal class StockDetailPage : BasePager() {
     }
 
     override fun onDestroyPager() {
-        detailRequestId++
+        detailRequests.invalidate()
         removeWatchlistObserver?.invoke()
         removeWatchlistObserver = null
         super.onDestroyPager()
@@ -127,26 +128,26 @@ internal class StockDetailPage : BasePager() {
             acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 缺少股票代码")
             return
         }
-        val requestId = ++detailRequestId
+        val requestId = detailRequests.next()
         loading = true
         errorMessage = ""
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 开始加载: $code")
         lifecycleScope.launch {
             when (val result = repository.loadDetail(this, code)) {
                 is StockLoadResult.Success -> {
-                    if (requestId != detailRequestId) return@launch
+                    if (!acceptResult(requestId, code)) return@launch
                     detail = result.data.detail
                     analysis = result.data.analysis
                     errorMessage = ""
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载成功: $code")
                 }
                 StockLoadResult.Empty -> {
-                    if (requestId != detailRequestId) return@launch
+                    if (!acceptResult(requestId, code)) return@launch
                     errorMessage = "未找到股票：$code"
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 未找到股票: $code")
                 }
                 is StockLoadResult.Failure -> {
-                    if (requestId != detailRequestId) return@launch
+                    if (!acceptResult(requestId, code)) return@launch
                     errorMessage = result.message
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载失败: $code, ${result.message}")
                 }
@@ -156,6 +157,12 @@ internal class StockDetailPage : BasePager() {
     }
 
     private fun hasValidCode(): Boolean = pagerData.params.optString("code").trim().isNotEmpty()
+
+    private fun acceptResult(requestId: Int, code: String): Boolean {
+        if (detailRequests.isLatest(requestId)) return true
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 丢弃过期结果: $code, $requestId")
+        return false
+    }
 
     private fun selectChartPeriod(period: StockChartPeriod) {
         selectedChartPeriod = period

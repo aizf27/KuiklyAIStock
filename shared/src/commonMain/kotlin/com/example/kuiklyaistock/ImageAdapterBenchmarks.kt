@@ -88,7 +88,7 @@ internal class ImageAdapterStandardTest : BasePager() {
     override fun body(): ViewBuilder {
         val ctx = this
         return {
-            RouterNavBar {
+            TemplateNavBar {
                 attr {
                     title = "ImageAdapter基准测试"
                 }

@@ -28,4 +28,9 @@ object WatchlistStore {
         quotes: List<com.example.kuiklyaistock.model.StockQuote>,
         codes: Set<String> = favoriteCodes,
     ) = quotes.filter { it.code in codes }
+
+    internal fun resetForTest() {
+        favoriteCodes.clear()
+        observers.clear()
+    }
 }
