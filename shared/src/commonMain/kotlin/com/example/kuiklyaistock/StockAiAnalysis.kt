@@ -43,6 +43,7 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
             AiAnalysisItem("事实摘要", analysis.factSummary)
             AiAnalysisItem("观点判断", analysis.trendJudgement)
             AiAnalysisItem("关注要点", analysis.focusPoint)
+            AiAnalysisItem("信号解读", analysis.signalInterpretation)
             AiAnalysisItem("依据", analysis.evidenceSummary)
             AiAnalysisItem("风险提示", analysis.riskReminder, StockDesignTokens.risk)
             Text {

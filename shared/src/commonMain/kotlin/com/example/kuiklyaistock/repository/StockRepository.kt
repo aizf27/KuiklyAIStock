@@ -202,7 +202,7 @@ class MockStockRepository(
             fallingCount = quotes.count { it.isFalling },
             flatCount = quotes.count { !it.isRising && !it.isFalling },
             sessionStatus = "已收盘",
-            turnover = details.sumOf { it.turnover },
+            sampleTurnoverAmount = details.sumOf { it.turnover },
             indices = listOf(
                 MarketIndexQuote("上证指数", "000001", 3_280.12, 13.66, 0.42, "2026-09-07 15:00"),
                 MarketIndexQuote("深证成指", "399001", 10_456.20, -18.85, -0.18, "2026-09-07 15:00"),
@@ -215,7 +215,7 @@ class MockStockRepository(
         scope.waitForMockResponse()
         forcedResult<StockDetailData>(StockRequestType.DETAIL)?.let { return it }
         val normalized = code.trim()
-        val detail = details.firstOrNull { it.quote.code == normalized || it.quote.symbol == normalized }
+        val detail = details.firstOrNull { it.quote.code == normalized }
             ?: return StockLoadResult.Empty
         return StockLoadResult.Success(StockDetailData(detail, analyses[normalized]))
     }

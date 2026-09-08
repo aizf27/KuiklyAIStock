@@ -226,7 +226,6 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(sto
     View {
         attr {
             backgroundColor(StockDesignTokens.surface)
-            borderRadius(StockDesignTokens.sectionRadius)
             padding(16f)
         }
         View {
@@ -260,6 +259,13 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(sto
                 marginTop(6f)
             }
         }
+        View {
+            attr {
+                height(1f)
+                backgroundColor(StockDesignTokens.divider)
+                marginTop(14f)
+            }
+        }
     }
 }
 
@@ -267,7 +273,6 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockMetricsPanel(s
     View {
         attr {
             backgroundColor(StockDesignTokens.surface)
-            borderRadius(StockDesignTokens.sectionRadius)
             padding(left = 14f, right = 14f, top = 14f, bottom = 2f)
         }
         View {
@@ -275,15 +280,27 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockMetricsPanel(s
             StockMetric("今开", formatStockPrice(stock.open))
             StockMetric("昨收", formatStockPrice(stock.previousClose))
         }
+        StockMetricsDivider()
         View {
             attr { flexDirectionRow() }
             StockMetric("最高", formatStockPrice(stock.high))
             StockMetric("最低", formatStockPrice(stock.low))
         }
+        StockMetricsDivider()
         View {
             attr { flexDirectionRow() }
             StockMetric("成交量", formatStockVolume(stock.volume))
             StockMetric("成交额", formatStockTurnover(stock.turnover))
+        }
+    }
+}
+
+private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockMetricsDivider() {
+    View {
+        attr {
+            height(1f)
+            backgroundColor(StockDesignTokens.divider)
+            marginBottom(14f)
         }
     }
 }

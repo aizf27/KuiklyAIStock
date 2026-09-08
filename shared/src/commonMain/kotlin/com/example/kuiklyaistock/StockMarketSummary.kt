@@ -48,7 +48,11 @@ internal fun ViewContainer<*, *>.StockMarketSummary(summary: MarketSummary?) {
                 }
                 MarketSummaryItem("上涨", summary.risingCount.toString(), StockDesignTokens.rise)
                 MarketSummaryItem("下跌", summary.fallingCount.toString(), StockDesignTokens.fall)
-                MarketSummaryItem("成交额", formatStockTurnover(summary.turnover), StockDesignTokens.primaryText)
+                MarketSummaryItem(
+                    "样本成交额",
+                    formatStockTurnover(summary.sampleTurnoverAmount),
+                    StockDesignTokens.primaryText,
+                )
             }
             Text {
                 attr {

@@ -120,13 +120,16 @@ internal fun ViewContainer<*, *>.StockTrendChart(
             context.stroke()
 
             context.beginPath()
-            prices.forEachIndexed { index, price ->
-                val x = 8f + chartWidth * index / (prices.size - 1).coerceAtLeast(1)
-                val y = 12f + chartHeight * (1f - ((price - minPrice) / range).toFloat())
-                if (index == 0) context.moveTo(x, y) else context.lineTo(x, y)
-            }
             if (prices.size == 1) {
-                context.lineTo(8f + chartWidth, 66f)
+                val y = 12f + chartHeight * (1f - ((prices.first() - minPrice) / range).toFloat())
+                context.moveTo(8f, y)
+                context.lineTo(8f + chartWidth, y)
+            } else {
+                prices.forEachIndexed { index, price ->
+                    val x = 8f + chartWidth * index / (prices.size - 1)
+                    val y = 12f + chartHeight * (1f - ((price - minPrice) / range).toFloat())
+                    if (index == 0) context.moveTo(x, y) else context.lineTo(x, y)
+                }
             }
             context.strokeStyle(lineColor)
             context.lineWidth(3f)
@@ -136,7 +139,7 @@ internal fun ViewContainer<*, *>.StockTrendChart(
             attr { flexDirectionRow() }
             Text {
                 attr {
-                    text(points.first().time)
+                    text(points.first().label)
                     fontSize(11f)
                     color(StockDesignTokens.tertiaryText)
                     flex(1f)
@@ -152,7 +155,7 @@ internal fun ViewContainer<*, *>.StockTrendChart(
             }
             Text {
                 attr {
-                    text(points.last().time)
+                    text(points.last().label)
                     fontSize(11f)
                     color(StockDesignTokens.tertiaryText)
                 }

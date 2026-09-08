@@ -9,9 +9,6 @@ data class StockQuote(
     val changePercent: Double,
     val updatedAt: String,
 ) {
-    val symbol: String
-        get() = code
-
     val isRising: Boolean
         get() = change > 0
 
@@ -26,7 +23,7 @@ data class MarketSummary(
     val fallingCount: Int,
     val flatCount: Int,
     val sessionStatus: String,
-    val turnover: Double,
+    val sampleTurnoverAmount: Double,
     val indices: List<MarketIndexQuote>,
     val updatedAt: String,
 )
@@ -56,7 +53,7 @@ data class StockDetail(
 
 // 简化的走势数据点，供跨端走势组件渲染。
 data class TrendPoint(
-    val time: String,
+    val label: String,
     val price: Double,
 )
 
