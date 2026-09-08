@@ -9,7 +9,7 @@ import com.tencent.kuikly.core.views.View
 // 股票页面统一顶部栏，避免复用模板渐变导航栏。
 internal fun ViewContainer<*, *>.StockTopBar(
     pager: BasePager,
-    title: String,
+    title: () -> String,
     showBack: Boolean,
 ) {
     View {
@@ -43,7 +43,7 @@ internal fun ViewContainer<*, *>.StockTopBar(
             }
             Text {
                 attr {
-                    text(title)
+                    text(title())
                     fontSize(17f)
                     fontWeightBold()
                     color(StockDesignTokens.primaryText)

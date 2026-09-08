@@ -12,6 +12,9 @@ import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.coroutines.launch
+import com.tencent.kuikly.core.directives.vif
+import com.tencent.kuikly.core.directives.velseif
+import com.tencent.kuikly.core.directives.velse
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
@@ -46,17 +49,18 @@ internal class StockDetailPage : BasePager() {
         val ctx = this
         return {
             attr { backgroundColor(StockDesignTokens.pageBackground) }
-            StockTopBar(ctx, "股票详情", true)
-            if (ctx.loading && ctx.detail == null) {
+            StockTopBar(ctx, { "股票详情" }, true)
+            vif({ ctx.loading && ctx.detail == null }) {
                 StockLoadingState("正在加载股票详情...")
-            } else if (ctx.errorMessage.isNotEmpty() && ctx.detail == null) {
+            }
+            velseif({ ctx.errorMessage.isNotEmpty() && ctx.detail == null }) {
                 val canRetry = ctx.hasValidCode()
                 StockStateText(ctx.errorMessage, if (canRetry) "重新加载" else "返回行情") {
                     if (canRetry) ctx.loadDetail()
                     else ctx.acquireModule<com.tencent.kuikly.core.module.RouterModule>(com.tencent.kuikly.core.module.RouterModule.MODULE_NAME).closePage()
                 }
-            } else {
-                if (ctx.errorMessage.isNotEmpty()) StockRetryBanner(ctx.errorMessage) { ctx.loadDetail() }
+            }
+            velse {
                 ctx.detail?.let { stock ->
                     Scroller {
                         attr {
@@ -68,7 +72,7 @@ internal class StockDetailPage : BasePager() {
                                 bottom = 24f,
                             )
                         }
-                        StockDetailIdentity(stock, ctx.isFavorite(stock.quote.code)) {
+                        StockDetailIdentity(stock, { ctx.isFavorite(stock.quote.code) }) {
                             ctx.toggleFavorite(stock.quote.code)
                         }
                         StockPricePanel(stock)
@@ -99,20 +103,26 @@ internal class StockDetailPage : BasePager() {
                                     flex(1f)
                                 }
                             }
-                            StockTrendPeriodSelector(ctx.selectedChartPeriod) { period ->
+                            StockTrendPeriodSelector({ ctx.selectedChartPeriod }) { period ->
                                 ctx.selectChartPeriod(period)
                             }
                         }
-                        StockTrendChart(
-                            points = if (ctx.selectedChartPeriod == StockChartPeriod.INTRADAY) {
-                                stock.intradayTrend
-                            } else {
-                                stock.dailyTrend
-                            },
-                            width = ctx.pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f,
-                            previousClose = stock.previousClose,
-                            change = stock.quote.change,
-                        )
+                        vif({ ctx.selectedChartPeriod == StockChartPeriod.INTRADAY }) {
+                            StockTrendChart(
+                                points = stock.intradayTrend,
+                                width = ctx.pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f,
+                                previousClose = stock.previousClose,
+                                change = stock.quote.change,
+                            )
+                        }
+                        velse {
+                            StockTrendChart(
+                                points = stock.dailyTrend,
+                                width = ctx.pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f,
+                                previousClose = stock.previousClose,
+                                change = stock.quote.change,
+                            )
+                        }
                         AiAnalysisSection(ctx.analysis)
                     }
                 }
@@ -183,7 +193,7 @@ internal class StockDetailPage : BasePager() {
 
 private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockDetailIdentity(
     stock: StockDetail,
-    favorite: Boolean,
+    favorite: () -> Boolean,
     onFavorite: () -> Unit,
 ) {
     View {
@@ -220,9 +230,9 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockDetailIdentity
             event { click { onFavorite() } }
             Text {
                 attr {
-                    text(if (favorite) "★" else "☆")
+                    text(if (favorite()) "★" else "☆")
                     fontSize(24f)
-                    color(if (favorite) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
+                    color(if (favorite()) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
                 }
             }
         }

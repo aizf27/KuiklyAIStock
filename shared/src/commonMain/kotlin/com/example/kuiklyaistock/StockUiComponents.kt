@@ -48,7 +48,7 @@ internal fun formatStockTurnover(value: Double): String =
 // 可复用的股票列表行，星标和整行点击分别交给页面处理。
 internal fun ViewContainer<*, *>.StockQuoteRow(
     quote: StockQuote,
-    favorite: Boolean = false,
+    favorite: () -> Boolean = { false },
     onFavorite: () -> Unit = {},
     onClick: () -> Unit,
 ) {
@@ -72,9 +72,9 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
             event { click { onFavorite() } }
             Text {
                 attr {
-                    text(if (favorite) "★" else "☆")
+                    text(if (favorite()) "★" else "☆")
                     fontSize(20f)
-                    color(if (favorite) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
+                    color(if (favorite()) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
                 }
             }
         }

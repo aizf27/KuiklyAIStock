@@ -16,7 +16,7 @@ internal object StockTabs {
 
 // 应用底部主导航，页面只负责处理 Tab 选择后的业务动作。
 internal fun ViewContainer<*, *>.StockBottomBar(
-    selectedTab: String,
+    selectedTab: () -> String,
     onTabSelected: (String) -> Unit,
 ) {
     View {
@@ -27,9 +27,9 @@ internal fun ViewContainer<*, *>.StockBottomBar(
         View { attr { height(1f); backgroundColor(StockDesignTokens.divider) } }
         View {
             attr { flex(1f); flexDirectionRow() }
-            StockTabItem("⌁", StockTabs.MARKET, selectedTab == StockTabs.MARKET, onTabSelected)
-            StockTabItem("♡", StockTabs.WATCHLIST, selectedTab == StockTabs.WATCHLIST, onTabSelected)
-            StockTabItem("✦", StockTabs.AI, selectedTab == StockTabs.AI, onTabSelected)
+            StockTabItem("⌁", StockTabs.MARKET, { selectedTab() == StockTabs.MARKET }, onTabSelected)
+            StockTabItem("♡", StockTabs.WATCHLIST, { selectedTab() == StockTabs.WATCHLIST }, onTabSelected)
+            StockTabItem("✦", StockTabs.AI, { selectedTab() == StockTabs.AI }, onTabSelected)
         }
     }
 }
@@ -37,7 +37,7 @@ internal fun ViewContainer<*, *>.StockBottomBar(
 private fun ViewContainer<*, *>.StockTabItem(
     icon: String,
     title: String,
-    selected: Boolean,
+    selected: () -> Boolean,
     onTabSelected: (String) -> Unit,
 ) {
     View {
@@ -54,7 +54,7 @@ private fun ViewContainer<*, *>.StockTabItem(
                 text(icon)
                 fontSize(16f)
                 fontWeightBold()
-                color(if (selected) StockDesignTokens.brand else StockDesignTokens.secondaryText)
+                color(if (selected()) StockDesignTokens.brand else StockDesignTokens.secondaryText)
                 marginBottom(2f)
             }
         }
@@ -63,7 +63,7 @@ private fun ViewContainer<*, *>.StockTabItem(
                 text(title)
                 fontSize(13f)
                 fontWeightBold()
-                color(if (selected) StockDesignTokens.brand else StockDesignTokens.secondaryText)
+                color(if (selected()) StockDesignTokens.brand else StockDesignTokens.secondaryText)
             }
         }
     }

@@ -12,7 +12,7 @@ internal enum class StockChartPeriod(val title: String) {
 }
 
 internal fun ViewContainer<*, *>.StockTrendPeriodSelector(
-    selectedPeriod: StockChartPeriod,
+    selectedPeriod: () -> StockChartPeriod,
     onPeriodSelected: (StockChartPeriod) -> Unit,
 ) {
     View {
@@ -24,7 +24,7 @@ internal fun ViewContainer<*, *>.StockTrendPeriodSelector(
                     height(StockDesignTokens.minimumTouchTarget)
                     allCenter()
                     backgroundColor(
-                        if (period == selectedPeriod) StockDesignTokens.brandBackground else StockDesignTokens.surface
+                        if (period == selectedPeriod()) StockDesignTokens.brandBackground else StockDesignTokens.surface
                     )
                 }
                 event { click { onPeriodSelected(period) } }
@@ -33,7 +33,7 @@ internal fun ViewContainer<*, *>.StockTrendPeriodSelector(
                         text(period.title)
                         fontSize(13f)
                         fontWeightBold()
-                        color(if (period == selectedPeriod) StockDesignTokens.brand else StockDesignTokens.secondaryText)
+                        color(if (period == selectedPeriod()) StockDesignTokens.brand else StockDesignTokens.secondaryText)
                     }
                 }
             }
