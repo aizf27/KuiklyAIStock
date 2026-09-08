@@ -1,7 +1,6 @@
 package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
-import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.module.RouterModule
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
@@ -13,11 +12,6 @@ internal object StockTabs {
     const val WATCHLIST = "自选"
     const val AI = "AI解读"
 
-    fun fromRoute(value: String): String = when (value) {
-        WATCHLIST -> WATCHLIST
-        AI -> AI
-        else -> MARKET
-    }
 }
 
 // 应用底部主导航，页面只负责处理 Tab 选择后的业务动作。
@@ -28,12 +22,15 @@ internal fun ViewContainer<*, *>.StockBottomBar(
     View {
         attr {
             height(64f)
-            backgroundColor(Color.WHITE)
-            flexDirectionRow()
+            backgroundColor(StockDesignTokens.surface)
         }
-        StockTabItem("▦", StockTabs.MARKET, selectedTab == StockTabs.MARKET, onTabSelected)
-        StockTabItem("★", StockTabs.WATCHLIST, selectedTab == StockTabs.WATCHLIST, onTabSelected)
-        StockTabItem("AI", StockTabs.AI, selectedTab == StockTabs.AI, onTabSelected)
+        View { attr { height(1f); backgroundColor(StockDesignTokens.divider) } }
+        View {
+            attr { flex(1f); flexDirectionRow() }
+            StockTabItem("⌁", StockTabs.MARKET, selectedTab == StockTabs.MARKET, onTabSelected)
+            StockTabItem("♡", StockTabs.WATCHLIST, selectedTab == StockTabs.WATCHLIST, onTabSelected)
+            StockTabItem("✦", StockTabs.AI, selectedTab == StockTabs.AI, onTabSelected)
+        }
     }
 }
 
@@ -47,7 +44,7 @@ private fun ViewContainer<*, *>.StockTabItem(
         attr {
             flex(1f)
             allCenter()
-            backgroundColor(if (selected) Color(0xFFEFF6FF) else Color.WHITE)
+            backgroundColor(StockDesignTokens.surface)
         }
         event {
             click { onTabSelected(title) }
@@ -57,7 +54,7 @@ private fun ViewContainer<*, *>.StockTabItem(
                 text(icon)
                 fontSize(16f)
                 fontWeightBold()
-                color(if (selected) Color(0xFF2563EB) else Color(0xFF6B7280))
+                color(if (selected) StockDesignTokens.brand else StockDesignTokens.secondaryText)
                 marginBottom(2f)
             }
         }
@@ -66,22 +63,14 @@ private fun ViewContainer<*, *>.StockTabItem(
                 text(title)
                 fontSize(13f)
                 fontWeightBold()
-                color(if (selected) Color(0xFF2563EB) else Color(0xFF6B7280))
+                color(if (selected) StockDesignTokens.brand else StockDesignTokens.secondaryText)
             }
         }
     }
 }
 
-internal fun BasePager.openStockPage(
-    pageName: String,
-    code: String? = null,
-    selectedTab: String? = null,
-) {
+internal fun BasePager.openStockDetail(code: String) {
     val pageData = JSONObject()
-    code?.let {
-        pageData.put("code", it)
-        pageData.put("symbol", it)
-    }
-    selectedTab?.let { pageData.put("selectedTab", it) }
-    acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage(pageName, pageData)
+    pageData.put("code", code)
+    acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("stock_detail", pageData)
 }

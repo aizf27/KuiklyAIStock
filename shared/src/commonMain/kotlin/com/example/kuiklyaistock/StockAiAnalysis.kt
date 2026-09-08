@@ -1,19 +1,18 @@
 package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.model.AiAnalysis
-import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 
-// 详情页的 AI 分析信息卡片。
+// 详情页将市场事实、AI 观点与风险分层呈现，避免被理解为确定性投资建议。
 internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
     Text {
         attr {
-            text("AI 分析与解读")
+            text("AI 观点参考")
             fontSize(17f)
             fontWeightBold()
-            color(Color(0xFF1F2937))
+            color(StockDesignTokens.primaryText)
             marginTop(20f)
             marginBottom(8f)
         }
@@ -21,42 +20,64 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
     if (analysis == null) {
         Text {
             attr {
-                text("暂无 AI 分析")
+                text("暂无 AI 解读")
                 fontSize(14f)
-                color(Color(0xFF6B7280))
+                color(StockDesignTokens.secondaryText)
             }
         }
     } else {
-        AnalysisCard("趋势判断", analysis.trendJudgement, Color(0xFFEFF6FF))
-        AnalysisCard("操作提示", analysis.operationTip, Color(0xFFF0FDF4))
-        AnalysisCard("风险提醒", analysis.riskReminder, Color(0xFFFFF7ED))
-        AnalysisCard("信号解读", analysis.signalInterpretation, Color(0xFFF3F4F6))
-        AnalysisCard("行情总结", analysis.marketSummary, Color(0xFFF8FAFC))
+        View {
+            attr {
+                backgroundColor(StockDesignTokens.surface)
+                borderRadius(StockDesignTokens.sectionRadius)
+                padding(14f)
+            }
+            Text {
+                attr {
+                    text("观点参考 · ${analysis.applicablePeriod}${if (analysis.isDemo) " · 演示数据" else ""}")
+                    fontSize(12f)
+                    fontWeightBold()
+                    color(StockDesignTokens.brand)
+                }
+            }
+            AiAnalysisItem("事实摘要", analysis.factSummary)
+            AiAnalysisItem("观点判断", analysis.trendJudgement)
+            AiAnalysisItem("关注要点", analysis.focusPoint)
+            AiAnalysisItem("依据", analysis.evidenceSummary)
+            AiAnalysisItem("风险提示", analysis.riskReminder, StockDesignTokens.risk)
+            Text {
+                attr {
+                    text("数据截至 ${analysis.updatedAt}")
+                    fontSize(11f)
+                    color(StockDesignTokens.tertiaryText)
+                    marginTop(10f)
+                }
+            }
+        }
     }
 }
 
-private fun ViewContainer<*, *>.AnalysisCard(title: String, content: String, background: Color) {
+private fun ViewContainer<*, *>.AiAnalysisItem(
+    title: String,
+    content: String,
+    titleColor: com.tencent.kuikly.core.base.Color = StockDesignTokens.secondaryText,
+) {
     View {
-        attr {
-            backgroundColor(background)
-            borderRadius(8f)
-            padding(left = 14f, right = 14f, top = 12f, bottom = 12f)
-            marginBottom(8f)
-        }
+        attr { marginTop(12f) }
         Text {
             attr {
                 text(title)
-                fontSize(13f)
+                fontSize(12f)
                 fontWeightBold()
-                color(Color(0xFF374151))
+                color(titleColor)
             }
         }
         Text {
             attr {
                 text(content)
                 fontSize(14f)
-                color(Color(0xFF4B5563))
-                marginTop(5f)
+                color(StockDesignTokens.primaryText)
+                marginTop(4f)
             }
         }
     }

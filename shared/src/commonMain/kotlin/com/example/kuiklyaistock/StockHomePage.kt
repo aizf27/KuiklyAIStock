@@ -2,15 +2,15 @@ package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
 import com.example.kuiklyaistock.base.BridgeModule
-import com.example.kuiklyaistock.model.StockQuote
+import com.example.kuiklyaistock.model.AiMarketOverview
+import com.example.kuiklyaistock.model.AiStockInsight
 import com.example.kuiklyaistock.model.MarketSummary
+import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
-import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
-import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
@@ -22,128 +22,86 @@ internal class StockHomePage : BasePager() {
     private var loading by observable(true)
     private var quotes by observable(emptyList<StockQuote>())
     private var marketSummary by observable<MarketSummary?>(null)
+    private var overview by observable<AiMarketOverview?>(null)
+    private var insights by observable(emptyList<AiStockInsight>())
     private var errorMessage by observable("")
+    private var favoriteCodes by observable(emptySet<String>())
     private var selectedTab by observable(StockTabs.MARKET)
-    private var favoriteVersion by observable(0)
+    private var removeWatchlistObserver: (() -> Unit)? = null
 
     override fun created() {
         super.created()
-        selectedTab = StockTabs.fromRoute(pagerData.params.optString("selectedTab"))
-        loadQuotes()
+        removeWatchlistObserver = WatchlistStore.subscribe { favoriteCodes = it }
+        loadContent()
+    }
+
+    override fun onDestroyPager() {
+        removeWatchlistObserver?.invoke()
+        removeWatchlistObserver = null
+        super.onDestroyPager()
     }
 
     override fun body(): ViewBuilder {
         val ctx = this
         return {
-            attr {
-                backgroundColor(Color(0xFFF8FAFC))
-            }
-            RouterNavBar {
-                attr {
-                    title = "AI 股票行情"
-                    backDisable = true
-                }
-            }
-            if (ctx.loading) {
-                StockStateText("正在加载行情...")
-            } else if (ctx.errorMessage.isNotEmpty()) {
-                StockStateText(ctx.errorMessage, "重新加载") { ctx.loadQuotes() }
-            } else {
-                val visibleQuotes = ctx.currentQuotes()
-                Scroller {
-                    attr {
-                        flex(1f)
-                        padding(left = 16f, right = 16f, top = 14f, bottom = 20f)
-                    }
-                    Text {
-                        attr {
-                            text("行情中心")
-                            fontSize(24f)
-                            fontWeightBold()
-                            color(Color(0xFF1F2937))
-                            marginBottom(4f)
-                        }
-                    }
-                    Text {
-                        attr {
-                            text("盘中行情 · ${visibleQuotes.size} 只股票")
-                            fontSize(13f)
-                            color(Color(0xFF6B7280))
-                            marginBottom(12f)
-                        }
-                        }
-                    StockMarketSummary(ctx.marketSummary)
-                    Text {
-                        attr {
-                            text(if (ctx.selectedTab == StockTabs.WATCHLIST) "自选股票" else "全部行情")
-                            fontSize(17f)
-                            fontWeightBold()
-                            color(Color(0xFF1F2937))
-                            marginBottom(10f)
-                        }
-                    }
-                    if (visibleQuotes.isEmpty()) {
-                        Text {
-                            attr {
-                                text("暂无自选股票，点击行情中的星标添加")
-                                fontSize(14f)
-                                color(Color(0xFF6B7280))
-                                marginTop(20f)
-                            }
-                        }
-                    } else {
-                        visibleQuotes.forEach { quote ->
-                            StockQuoteRow(
-                                quote = quote,
-                                favorite = WatchlistStore.isFavorite(quote.code),
-                                onFavorite = { ctx.toggleFavorite(quote.code) },
-                                onClick = { ctx.openDetail(quote.code) },
-                            )
-                        }
-                    }
-                }
+            attr { backgroundColor(StockDesignTokens.pageBackground) }
+            StockTopBar(ctx, if (ctx.selectedTab == StockTabs.AI) "AI 解读" else "AI 股票", false)
+            when {
+                ctx.loading -> StockLoadingState("正在加载演示数据...")
+                ctx.errorMessage.isNotEmpty() -> StockStateText(ctx.errorMessage, "重新加载") { ctx.loadContent() }
+                ctx.selectedTab == StockTabs.AI -> StockAiContent(ctx.overview, ctx.insights) { ctx.openDetail(it) }
+                else -> ctx.MarketContent()
             }
             StockBottomBar(ctx.selectedTab) { tab ->
-                if (tab == StockTabs.AI && ctx.selectedTab != StockTabs.AI) {
-                    ctx.openStockPage("stock_ai")
-                } else {
+                if (ctx.selectedTab != tab) {
                     ctx.selectedTab = tab
+                    ctx.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 切换根Tab: $tab")
                 }
             }
         }
     }
 
-    private fun loadQuotes() {
+    private fun MarketContent() {
+        val ctx = this
+        val visibleQuotes = if (ctx.selectedTab == StockTabs.WATCHLIST) WatchlistStore.filterFavorite(ctx.quotes, ctx.favoriteCodes) else ctx.quotes
+        Scroller {
+            attr { flex(1f); padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 20f) }
+            Text { attr { text(if (ctx.selectedTab == StockTabs.WATCHLIST) "我的自选" else "全部行情"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+            Text { attr { text("${ctx.marketSummary?.sessionStatus ?: "数据同步中"} · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
+            StockMarketSummary(ctx.marketSummary)
+            StockQuoteListHeader()
+            if (visibleQuotes.isEmpty()) StockInlineEmptyState("暂无自选股票", "去行情添加") { ctx.selectedTab = StockTabs.MARKET }
+            else visibleQuotes.forEach { quote ->
+                StockQuoteRow(quote, quote.code in ctx.favoriteCodes, { ctx.toggleFavorite(quote.code) }) { ctx.openDetail(quote.code) }
+            }
+        }
+    }
+
+    private fun loadContent() {
         loading = true
-        val result = repository.getQuotes()
-        quotes = result
+        quotes = repository.getQuotes()
         marketSummary = repository.getMarketSummary()
-        errorMessage = if (result.isEmpty()) "暂无行情数据" else ""
-        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
-            if (result.isEmpty()) "stock_home 行情加载为空" else "stock_home 行情加载成功: ${result.size}"
-        )
+        overview = repository.getAiMarketOverview()
+        insights = repository.getAiInsights()
+        errorMessage = if (quotes.isEmpty()) "暂无行情数据" else ""
         loading = false
     }
 
     private fun openDetail(code: String) {
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")
-        openStockPage("stock_detail", code)
-    }
-
-    private fun currentQuotes(): List<StockQuote> {
-        favoriteVersion
-        return if (selectedTab == StockTabs.WATCHLIST) {
-            WatchlistStore.filterFavorite(quotes)
-        } else {
-            quotes
-        }
+        openStockDetail(code)
     }
 
     private fun toggleFavorite(code: String) {
         val favorite = WatchlistStore.toggle(code)
-        favoriteVersion += 1
-        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(
-            "stock_home 自选${if (favorite) "添加" else "移除"}: $code"
-        )
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 自选${if (favorite) "添加" else "移除"}: $code")
+    }
+}
+
+private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockQuoteListHeader() {
+    View {
+        attr { flexDirectionRow(); padding(left = StockDesignTokens.minimumTouchTarget, right = 4f, bottom = 6f) }
+        Text { attr { text("名称 / 代码"); fontSize(11f); color(StockDesignTokens.tertiaryText); flex(1f) } }
+        View { attr { width(112f); alignItemsFlexEnd() }; Text { attr { text("最新 / 涨跌幅"); fontSize(11f); color(StockDesignTokens.tertiaryText) } } }
     }
 }

@@ -25,17 +25,33 @@ data class MarketSummary(
     val risingCount: Int,
     val fallingCount: Int,
     val flatCount: Int,
+    val sessionStatus: String,
+    val turnover: Double,
+    val indices: List<MarketIndexQuote>,
+    val updatedAt: String,
+)
+
+// 首页市场概览使用的指数报价。
+data class MarketIndexQuote(
+    val name: String,
+    val code: String,
+    val price: Double,
+    val change: Double,
+    val changePercent: Double,
     val updatedAt: String,
 )
 
 // 详情页使用的完整股票行情。
 data class StockDetail(
     val quote: StockQuote,
+    val open: Double,
+    val previousClose: Double,
     val high: Double,
     val low: Double,
     val volume: Long,
     val turnover: Double,
-    val trend: List<TrendPoint>,
+    val intradayTrend: List<TrendPoint>,
+    val dailyTrend: List<TrendPoint>,
 )
 
 // 简化的走势数据点，供跨端走势组件渲染。
@@ -47,10 +63,14 @@ data class TrendPoint(
 // AI 分析区域的四类信息。
 data class AiAnalysis(
     val trendJudgement: String,
-    val operationTip: String,
+    val focusPoint: String,
     val riskReminder: String,
     val signalInterpretation: String,
-    val marketSummary: String,
+    val factSummary: String,
+    val applicablePeriod: String,
+    val evidenceSummary: String,
+    val updatedAt: String,
+    val isDemo: Boolean,
 )
 
 // AI 解读首页的市场级结论。

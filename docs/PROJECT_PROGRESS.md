@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Task 1 重制计划 10 个阶段已完成，代码功能进入审查状态。
+Task 1 重制计划 10 个阶段已完成；UI P0 正式化改造已完成代码实现，等待可用 Gradle 环境进行共享编译与真机视觉验收。
 
 ## 已完成
 
@@ -22,6 +22,11 @@ Task 1 重制计划 10 个阶段已完成，代码功能进入审查状态。
 - [x] 完成阶段 8：独立 AI 解读页、市场观点和重点股票详情入口。
 - [x] 完成阶段 9：底部导航图标、目标 Tab 传递和页面风格统一。
 - [x] 完成阶段 10：两位小数格式、迷你趋势提示、错误重试入口和最终审计。
+- [x] 新增 `DESIGN.md` 与共享视觉 Token，统一股票页面的颜色、字号、间距、圆角和最小触控区域。
+- [x] 新增市场状态、指数报价、成交额、今开/昨收、分时/日K 和 AI 可信度 Mock 数据契约。
+- [x] 重构行情首页为市场概览和高密度列表，新增自选空态的返回行情入口。
+- [x] 重构详情页为价格、关键行情、双周期走势图和 AI 观点参考四层。
+- [x] 重构 AI 解读为事实、观点、依据、适用周期、风险和演示数据分层。
 
 ## 提交记录
 
@@ -54,8 +59,9 @@ Task 1 重制计划 10 个阶段已完成，代码功能进入审查状态。
 - `:shared:compileKotlinJvm`：任务不存在，当前 shared 仅配置 JS/Android target。
 - `:shared:jsTest`：测试编译阶段触发 Kuikly/Kotlin IR 内部错误（`IrSimpleFunctionSymbolImpl is already bound`），未进入断言执行。
 - `:androidApp:assembleDebug`：D8 转换 Kuikly/Kotlin 依赖失败，报 `Error while dexing`；另有 AGP 7.4.2 与 compileSdk 34 的环境警告。
+- UI P0 后的 `:shared:compileKotlinJs`：默认 Gradle Wrapper 缓存目录无法创建 `.lck` 文件；改用临时缓存后需下载 Gradle 8.5，但当前沙箱网络被拒绝，尚未进入源码编译。
 
 ## 下一步
 
-- 在可用 Android 构建环境中复测并进行真机视觉验收；当前 D8 环境问题不影响本轮 shared 业务代码完成度。
+- 在可联网且可写 Gradle 缓存的环境执行 `:shared:compileKotlinJs`，随后在 Android 真机完成 360x800、长文本、空数据和双周期图表视觉验收。
 - Task 2 复用本阶段模型、Repository、详情页和通用 UI，实现 `stock_chat`。

@@ -10,7 +10,7 @@ import kotlin.math.roundToLong
 
 // 统一股票涨跌颜色，避免不同页面出现相反的颜色规则。
 internal fun stockChangeColor(change: Double): Color =
-    if (change > 0) Color(0xFFE53E3E) else if (change < 0) Color(0xFF16A34A) else Color(0xFF6B7280)
+    if (change > 0) StockDesignTokens.rise else if (change < 0) StockDesignTokens.fall else StockDesignTokens.flat
 
 internal fun formatStockPrice(value: Double): String {
     val scaled = (value * 100).roundToLong()
@@ -41,71 +41,66 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
 ) {
     View {
         attr {
-            backgroundColor(Color.WHITE)
-            borderRadius(8f)
-            padding(left = 14f, right = 14f, top = 14f, bottom = 14f)
-            marginBottom(10f)
+            height(StockDesignTokens.quoteRowHeight)
+            backgroundColor(StockDesignTokens.surface)
+            padding(left = 4f, right = 4f)
+            flexDirectionRow()
+            alignItemsCenter()
         }
         event {
             click { onClick() }
         }
         View {
             attr {
-                flexDirectionRow()
-                alignItemsCenter()
+                width(StockDesignTokens.minimumTouchTarget)
+                height(StockDesignTokens.minimumTouchTarget)
+                allCenter()
             }
+            event { click { onFavorite() } }
             Text {
                 attr {
                     text(if (favorite) "★" else "☆")
-                    fontSize(22f)
-                    color(if (favorite) Color(0xFFF59E0B) else Color(0xFF9CA3AF))
-                    marginRight(10f)
-                }
-                event {
-                    click { onFavorite() }
+                    fontSize(20f)
+                    color(if (favorite) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
                 }
             }
+        }
+        View {
+            attr {
+                flex(1f)
+                flexDirectionRow()
+                alignItemsCenter()
+            }
             View {
-                attr {
-                    flex(1f)
-                }
+                attr { flex(1f) }
                 Text {
                     attr {
                         text(quote.name)
-                        fontSize(17f)
+                        fontSize(16f)
                         fontWeightBold()
-                        color(Color(0xFF111827))
+                        color(StockDesignTokens.primaryText)
                     }
                 }
                 Text {
                     attr {
                         text(quote.code)
-                        fontSize(12f)
-                        color(Color(0xFF6B7280))
-                        marginTop(4f)
+                        fontSize(11f)
+                        color(StockDesignTokens.secondaryText)
+                        marginTop(3f)
                     }
-                }
-            }
-            Text {
-                attr {
-                    text(if (quote.isRising) "↗" else if (quote.isFalling) "↘" else "→")
-                    fontSize(20f)
-                    fontWeightBold()
-                    color(stockChangeColor(quote.change))
-                    marginRight(10f)
                 }
             }
             View {
                 attr {
-                    width(92f)
+                    width(112f)
                     alignItemsFlexEnd()
                 }
                 Text {
                     attr {
                         text(formatStockPrice(quote.price))
-                        fontSize(18f)
+                        fontSize(17f)
                         fontWeightBold()
-                        color(Color(0xFF111827))
+                        color(StockDesignTokens.primaryText)
                     }
                 }
                 Text {
@@ -113,10 +108,17 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
                         text("${formatStockSigned(quote.change)}  ${formatStockPercent(quote.changePercent)}")
                         fontSize(12f)
                         color(stockChangeColor(quote.change))
-                        marginTop(4f)
+                        marginTop(3f)
                     }
                 }
             }
+        }
+    }
+    View {
+        attr {
+            height(1f)
+            backgroundColor(StockDesignTokens.divider)
+            marginLeft(StockDesignTokens.minimumTouchTarget)
         }
     }
 }
@@ -124,22 +126,21 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
 internal fun ViewContainer<*, *>.StockMetric(label: String, value: String) {
     View {
         attr {
-            width(50f)
-            marginRight(20f)
-            marginBottom(14f)
+            flex(1f)
+            marginBottom(16f)
         }
         Text {
             attr {
                 text(label)
                 fontSize(12f)
-                color(Color(0xFF6B7280))
+                color(StockDesignTokens.secondaryText)
             }
         }
         Text {
             attr {
                 text(value)
                 fontSize(15f)
-                color(Color(0xFF111827))
+                color(StockDesignTokens.primaryText)
                 marginTop(4f)
             }
         }
@@ -161,7 +162,7 @@ internal fun ViewContainer<*, *>.StockStateText(
             attr {
                 text(message)
                 fontSize(15f)
-                color(Color(0xFF6B7280))
+                color(StockDesignTokens.secondaryText)
             }
         }
         if (actionTitle.isNotEmpty()) {
@@ -170,13 +171,69 @@ internal fun ViewContainer<*, *>.StockStateText(
                     text(actionTitle)
                     fontSize(14f)
                     fontWeightBold()
-                    color(Color(0xFF2563EB))
+                color(StockDesignTokens.brand)
                     marginTop(14f)
                 }
                 event {
                     click { onAction() }
                 }
             }
+        }
+    }
+}
+
+internal fun ViewContainer<*, *>.StockLoadingState(message: String) {
+    View {
+        attr {
+            flex(1f)
+            padding(StockDesignTokens.pageHorizontalPadding)
+        }
+        Text {
+            attr {
+                text(message)
+                fontSize(14f)
+                color(StockDesignTokens.secondaryText)
+                marginBottom(14f)
+            }
+        }
+        repeat(3) {
+            View {
+                attr {
+                    height(StockDesignTokens.quoteRowHeight)
+                    backgroundColor(StockDesignTokens.surface)
+                    marginBottom(1f)
+                }
+            }
+        }
+    }
+}
+
+internal fun ViewContainer<*, *>.StockInlineEmptyState(
+    message: String,
+    actionTitle: String,
+    onAction: () -> Unit,
+) {
+    View {
+        attr {
+            padding(top = 28f, bottom = 28f)
+            allCenter()
+        }
+        Text {
+            attr {
+                text(message)
+                fontSize(14f)
+                color(StockDesignTokens.secondaryText)
+            }
+        }
+        Text {
+            attr {
+                text(actionTitle)
+                fontSize(14f)
+                fontWeightBold()
+                color(StockDesignTokens.brand)
+                marginTop(12f)
+            }
+            event { click { onAction() } }
         }
     }
 }

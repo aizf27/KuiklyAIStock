@@ -3,8 +3,15 @@ package com.example.kuiklyaistock.repository
 // 跨页面共享的本地自选状态，后续可替换为持久化实现。
 object WatchlistStore {
     private val favoriteCodes = linkedSetOf<String>()
+    private val observers = linkedSetOf<(Set<String>) -> Unit>()
 
-    fun isFavorite(code: String): Boolean = code in favoriteCodes
+    fun snapshot(): Set<String> = favoriteCodes.toSet()
+
+    fun subscribe(observer: (Set<String>) -> Unit): () -> Unit {
+        observers.add(observer)
+        observer(snapshot())
+        return { observers.remove(observer) }
+    }
 
     fun toggle(code: String): Boolean {
         if (favoriteCodes.contains(code)) {
@@ -12,9 +19,13 @@ object WatchlistStore {
         } else {
             favoriteCodes.add(code)
         }
-        return isFavorite(code)
+        val current = snapshot()
+        observers.toList().forEach { it(current) }
+        return code in current
     }
 
-    fun filterFavorite(quotes: List<com.example.kuiklyaistock.model.StockQuote>) =
-        quotes.filter { isFavorite(it.code) }
+    fun filterFavorite(
+        quotes: List<com.example.kuiklyaistock.model.StockQuote>,
+        codes: Set<String> = favoriteCodes,
+    ) = quotes.filter { it.code in codes }
 }

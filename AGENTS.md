@@ -9,6 +9,8 @@ KuiklyAIStock 是基于腾讯 Kuikly 跨端框架的股票类 AI Demo 工程，�
 - Task 1：基于 Kuikly 开发 AI 股票行情原型 Demo，包含行情列表、股票详情和 AI 分析/解读模块。
 - Task 2：基于 Kuikly 开发 AI 股票问答应用 Demo，包含聊天主页、消息记录、Markdown/结构化 AI 回复，以及跳转股票或指数详情页。
 
+Task 的拆解、实施顺序和验收标准以根目录 `TASKS.md` 为准；本文件负责全局开发约束。
+
 ## 当前技术栈
 
 - Kotlin Multiplatform，共享业务代码位于 `shared/src/commonMain`。
@@ -28,6 +30,7 @@ KuiklyAIStock 是基于腾讯 Kuikly 跨端框架的股票类 AI Demo 工程，�
 - 未经明确要求不要自动 commit。
 - Android 业务注释使用简短单行 `//`，关键网络请求、成功/失败分支和导航跳转补充日志。
 - Kuikly 页面和组件优先保持跨端兼容，避免直接依赖 Android 专有 UI。
+- 文档中的规范服务于后续实现，不代表当前 Task 已完成；开始编码前应先核对 `TASKS.md` 的当前状态。
 
 ## Kuikly 开发范式
 
@@ -83,6 +86,7 @@ KuiklyAIStock 是基于腾讯 Kuikly 跨端框架的股票类 AI Demo 工程，�
 - 不随意升级 Gradle、Kotlin、AGP、Kuikly 或第三方依赖。
 - 每次功能修改后进行对应编译或测试。
 - 完成任务后检查 git diff，确保没有无关修改。
+- 具体任务拆解、交付物和验收标准以根目录 `TASKS.md` 为执行基线。
 
 ### 当前推荐页面结构
 

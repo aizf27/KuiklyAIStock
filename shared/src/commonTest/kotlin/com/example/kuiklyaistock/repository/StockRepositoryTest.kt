@@ -25,9 +25,13 @@ class StockRepositoryTest {
 
         assertNotNull(detail)
         assertEquals("宁德时代", detail.quote.name)
-        assertTrue(detail.trend.isNotEmpty())
+        assertTrue(detail.intradayTrend.isNotEmpty())
+        assertTrue(detail.dailyTrend.isNotEmpty())
+        assertTrue(detail.previousClose > 0)
         assertNotNull(analysis)
-        assertTrue(analysis.marketSummary.isNotEmpty())
+        assertTrue(analysis.factSummary.isNotEmpty())
+        assertTrue(analysis.evidenceSummary.isNotEmpty())
+        assertTrue(analysis.isDemo)
     }
 
     @Test
@@ -38,6 +42,10 @@ class StockRepositoryTest {
         assertEquals(3, summary.risingCount)
         assertEquals(2, summary.fallingCount)
         assertEquals(0, summary.flatCount)
+        assertEquals("已收盘", summary.sessionStatus)
+        assertEquals(2, summary.indices.size)
+        assertTrue(summary.indices.all { it.price > 0 && it.updatedAt.isNotEmpty() })
+        assertTrue(summary.turnover > 0)
     }
 
     @Test
