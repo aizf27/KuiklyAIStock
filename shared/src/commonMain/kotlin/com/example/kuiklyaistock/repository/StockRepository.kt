@@ -8,19 +8,49 @@ import com.example.kuiklyaistock.model.MarketIndexQuote
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.TrendPoint
+import com.tencent.kuikly.core.coroutines.delay
+import com.tencent.kuikly.core.coroutines.CoroutineScope
+
+sealed class StockLoadResult<out T> {
+    data class Success<T>(val data: T) : StockLoadResult<T>()
+    data object Empty : StockLoadResult<Nothing>()
+    data class Failure(val message: String) : StockLoadResult<Nothing>()
+}
+
+data class StockHomeData(
+    val quotes: List<StockQuote>,
+    val marketSummary: MarketSummary,
+)
+
+data class StockDetailData(
+    val detail: StockDetail,
+    val analysis: AiAnalysis?,
+)
+
+data class StockAiData(
+    val overview: AiMarketOverview,
+    val insights: List<AiStockInsight>,
+)
+
+enum class StockRequestType {
+    HOME,
+    DETAIL,
+    AI,
+}
 
 // 股票数据仓库，后续可替换为真实行情服务。
 interface StockRepository {
-    fun getQuotes(): List<StockQuote>
-    fun getMarketSummary(): MarketSummary
-    fun getDetail(code: String): StockDetail?
-    fun getAiAnalysis(code: String): AiAnalysis?
-    fun getAiMarketOverview(): AiMarketOverview
-    fun getAiInsights(): List<AiStockInsight>
+    suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData>
+    suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData>
+    suspend fun loadAi(scope: CoroutineScope): StockLoadResult<StockAiData>
 }
 
 // 第一阶段使用的确定性本地数据。
-class MockStockRepository : StockRepository {
+class MockStockRepository(
+    private val delayMillis: Int = 240,
+    private val forcedFailures: Set<StockRequestType> = emptySet(),
+    private val forcedEmptyResults: Set<StockRequestType> = emptySet(),
+) : StockRepository {
     private val details: List<StockDetail> = listOf(
         stock(
             name = "腾讯控股",
@@ -157,10 +187,15 @@ class MockStockRepository : StockRepository {
         ),
     )
 
-    override fun getQuotes(): List<StockQuote> = details.map { it.quote }
+    override suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData> {
+        scope.waitForMockResponse()
+        forcedResult<StockHomeData>(StockRequestType.HOME)?.let { return it }
+        val quotes = details.map { it.quote }
+        if (quotes.isEmpty()) return StockLoadResult.Empty
+        return StockLoadResult.Success(StockHomeData(quotes, createMarketSummary(quotes)))
+    }
 
-    override fun getMarketSummary(): MarketSummary {
-        val quotes = getQuotes()
+    private fun createMarketSummary(quotes: List<StockQuote>): MarketSummary {
         return MarketSummary(
             totalCount = quotes.size,
             risingCount = quotes.count { it.isRising },
@@ -176,14 +211,26 @@ class MockStockRepository : StockRepository {
         )
     }
 
-    override fun getDetail(code: String): StockDetail? {
+    override suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData> {
+        scope.waitForMockResponse()
+        forcedResult<StockDetailData>(StockRequestType.DETAIL)?.let { return it }
         val normalized = code.trim()
-        return details.firstOrNull { it.quote.code == normalized || it.quote.symbol == normalized }
+        val detail = details.firstOrNull { it.quote.code == normalized || it.quote.symbol == normalized }
+            ?: return StockLoadResult.Empty
+        return StockLoadResult.Success(StockDetailData(detail, analyses[normalized]))
     }
 
-    override fun getAiAnalysis(code: String): AiAnalysis? = analyses[code.trim()]
+    override suspend fun loadAi(scope: CoroutineScope): StockLoadResult<StockAiData> {
+        scope.waitForMockResponse()
+        forcedResult<StockAiData>(StockRequestType.AI)?.let { return it }
+        val insights = details.mapNotNull { detail ->
+            analyses[detail.quote.code]?.let { analysis -> AiStockInsight(detail.quote, analysis) }
+        }
+        if (insights.isEmpty()) return StockLoadResult.Empty
+        return StockLoadResult.Success(StockAiData(createAiMarketOverview(), insights))
+    }
 
-    override fun getAiMarketOverview(): AiMarketOverview = AiMarketOverview(
+    private fun createAiMarketOverview(): AiMarketOverview = AiMarketOverview(
         title = "震荡中结构性机会占优",
         sentiment = "谨慎乐观",
         summary = "样本股票中科技与新能源方向表现较强，权重消费和金融仍处于整理阶段。",
@@ -191,9 +238,15 @@ class MockStockRepository : StockRepository {
         updatedAt = "2026-09-07 15:00",
     )
 
-    override fun getAiInsights(): List<AiStockInsight> = details.mapNotNull { detail ->
-        analyses[detail.quote.code]?.let { analysis ->
-            AiStockInsight(detail.quote, analysis)
+    private suspend fun CoroutineScope.waitForMockResponse() {
+        if (delayMillis > 0) delay(delayMillis)
+    }
+
+    private fun <T> forcedResult(type: StockRequestType): StockLoadResult<T>? {
+        return when {
+            type in forcedFailures -> StockLoadResult.Failure("模拟数据加载失败")
+            type in forcedEmptyResults -> StockLoadResult.Empty
+            else -> null
         }
     }
 

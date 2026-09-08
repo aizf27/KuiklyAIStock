@@ -8,9 +8,11 @@ import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
 import com.example.kuiklyaistock.repository.StockRepository
+import com.example.kuiklyaistock.repository.StockLoadResult
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
+import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
@@ -28,6 +30,7 @@ internal class StockHomePage : BasePager() {
     private var favoriteCodes by observable(emptySet<String>())
     private var selectedTab by observable(StockTabs.MARKET)
     private var removeWatchlistObserver: (() -> Unit)? = null
+    private var contentRequestId = 0
 
     override fun created() {
         super.created()
@@ -36,6 +39,7 @@ internal class StockHomePage : BasePager() {
     }
 
     override fun onDestroyPager() {
+        contentRequestId++
         removeWatchlistObserver?.invoke()
         removeWatchlistObserver = null
         super.onDestroyPager()
@@ -47,10 +51,13 @@ internal class StockHomePage : BasePager() {
             attr { backgroundColor(StockDesignTokens.pageBackground) }
             StockTopBar(ctx, if (ctx.selectedTab == StockTabs.AI) "AI 解读" else "AI 股票", false)
             when {
-                ctx.loading -> StockLoadingState("正在加载演示数据...")
-                ctx.errorMessage.isNotEmpty() -> StockStateText(ctx.errorMessage, "重新加载") { ctx.loadContent() }
-                ctx.selectedTab == StockTabs.AI -> StockAiContent(ctx.overview, ctx.insights) { ctx.openDetail(it) }
-                else -> ctx.MarketContent()
+                ctx.loading && !ctx.hasSelectedTabContent() -> StockLoadingState("正在加载演示数据...")
+                ctx.errorMessage.isNotEmpty() && !ctx.hasSelectedTabContent() -> StockStateText(ctx.errorMessage, "重新加载") { ctx.loadContent() }
+                else -> {
+                    if (ctx.errorMessage.isNotEmpty()) StockRetryBanner(ctx.errorMessage) { ctx.loadContent() }
+                    if (ctx.selectedTab == StockTabs.AI) StockAiContent(ctx.overview, ctx.insights) { ctx.openDetail(it) }
+                    else ctx.MarketContent()
+                }
             }
             StockBottomBar(ctx.selectedTab) { tab ->
                 if (ctx.selectedTab != tab) {
@@ -78,14 +85,43 @@ internal class StockHomePage : BasePager() {
     }
 
     private fun loadContent() {
+        val requestId = ++contentRequestId
         loading = true
-        quotes = repository.getQuotes()
-        marketSummary = repository.getMarketSummary()
-        overview = repository.getAiMarketOverview()
-        insights = repository.getAiInsights()
-        errorMessage = if (quotes.isEmpty()) "暂无行情数据" else ""
-        loading = false
+        errorMessage = ""
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 开始加载: $requestId")
+        lifecycleScope.launch {
+            val homeResult = repository.loadHome(this)
+            if (requestId != contentRequestId) return@launch
+            when (homeResult) {
+                is StockLoadResult.Success -> {
+                    quotes = homeResult.data.quotes
+                    marketSummary = homeResult.data.marketSummary
+                }
+                StockLoadResult.Empty -> errorMessage = "暂无行情数据"
+                is StockLoadResult.Failure -> errorMessage = homeResult.message
+            }
+
+            val aiResult = repository.loadAi(this)
+            if (requestId != contentRequestId) return@launch
+            when (aiResult) {
+                is StockLoadResult.Success -> {
+                    overview = aiResult.data.overview
+                    insights = aiResult.data.insights
+                }
+                StockLoadResult.Empty -> if (errorMessage.isEmpty()) errorMessage = "暂无 AI 解读数据"
+                is StockLoadResult.Failure -> if (errorMessage.isEmpty()) errorMessage = aiResult.message
+            }
+            loading = false
+            if (errorMessage.isEmpty()) {
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 加载成功: $requestId")
+            } else {
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 加载失败: $errorMessage")
+            }
+        }
     }
+
+    private fun hasSelectedTabContent(): Boolean =
+        if (selectedTab == StockTabs.AI) overview != null || insights.isNotEmpty() else quotes.isNotEmpty()
 
     private fun openDetail(code: String) {
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")

@@ -250,3 +250,23 @@ internal fun ViewContainer<*, *>.StockInlineEmptyState(
         }
     }
 }
+
+internal fun ViewContainer<*, *>.StockRetryBanner(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.warningBackground)
+            padding(left = StockDesignTokens.pageHorizontalPadding, right = 8f, top = 8f, bottom = 8f)
+            flexDirectionRow()
+            alignItemsCenter()
+        }
+        Text { attr { text(message); fontSize(12f); color(StockDesignTokens.risk); flex(1f) } }
+        View {
+            attr { padding(8f) }
+            event { click { onRetry() } }
+            Text { attr { text("重试"); fontSize(13f); fontWeightBold(); color(StockDesignTokens.brand) } }
+        }
+    }
+}
