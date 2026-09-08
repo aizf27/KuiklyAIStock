@@ -26,11 +26,24 @@ internal fun formatStockSigned(value: Double): String =
 internal fun formatStockPercent(value: Double): String =
     if (value > 0) "+${formatStockPrice(value)}%" else "${formatStockPrice(value)}%"
 
+private fun formatStockUnitValue(value: Double): String {
+    val roundedTenths = (value * 10).roundToLong()
+    val absolute = abs(roundedTenths)
+    val sign = if (roundedTenths < 0) "-" else ""
+    return if (absolute % 10 == 0L) {
+        "$sign${absolute / 10}"
+    } else {
+        "$sign${absolute / 10}.${absolute % 10}"
+    }
+}
+
 internal fun formatStockVolume(value: Long): String =
-    if (value >= 10_000_000) "${value / 10_000_000.0}千万" else "${value / 10_000.0}万"
+    if (value >= 10_000_000) "${formatStockUnitValue(value / 10_000_000.0)}千万"
+    else "${formatStockUnitValue(value / 10_000.0)}万"
 
 internal fun formatStockTurnover(value: Double): String =
-    if (value >= 100_000_000) "${value / 100_000_000.0}亿" else "${value / 10_000.0}万"
+    if (value >= 100_000_000) "${formatStockUnitValue(value / 100_000_000.0)}亿"
+    else "${formatStockUnitValue(value / 10_000.0)}万"
 
 // 可复用的股票列表行，星标和整行点击分别交给页面处理。
 internal fun ViewContainer<*, *>.StockQuoteRow(
