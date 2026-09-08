@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Task 1 重制计划和 9.8 优化计划五个阶段均已完成代码实现；共享源码与测试源码编译通过，Android 构建和真机视觉验收待完成。
+Task 1 重制计划和 9.8 优化计划五个阶段均已完成代码实现，并修复了异步化引入的响应式渲染问题；共享源码与测试源码编译通过，Android 构建和真机视觉验收待完成。
 
 ## 已完成
 
@@ -33,6 +33,7 @@ Task 1 重制计划和 9.8 优化计划五个阶段均已完成代码实现；�
 - [x] 删除 `symbol` 别名，明确样本成交额和走势图展示标签语义，展示 AI 信号解读。
 - [x] 删除未使用的模板调试页，保留宿主仍依赖的 `BridgeModule` 导航、关闭页面和日志能力。
 - [x] 补充格式化、涨跌颜色、自选订阅/筛选、Mock 一致性、未知代码和请求过期测试。
+- [x] 修复股票页面响应式渲染：用 `vif`/`velse` 与响应式 getter 替换普通控制流，行情首页加载态、Tab 切换、自选星标、自选过滤和走势周期切换均正常刷新。
 
 ## 提交记录
 
@@ -58,7 +59,8 @@ Task 1 重制计划和 9.8 优化计划五个阶段均已完成代码实现；�
 - `70b49c2` 统一股票导航栏与核心视觉细节
 - `67cd14a` 建立股票Repository异步加载边界
 - `d2c5e5b` 收口股票模型图表与数据语义
-- 阶段 5：清理股票模板依赖并同步测试文档（本次提交）
+- `c6247bb` 清理股票模板依赖并同步测试文档
+- `b6d0488` 修复股票页面响应式渲染，改用 vif/velse 替换普通控制流
 
 ## 验证记录
 
@@ -74,6 +76,7 @@ Task 1 重制计划和 9.8 优化计划五个阶段均已完成代码实现；�
 - 9.8 优化阶段使用项目内 `.gradle-user` 缓存执行 `:shared:compileKotlinJs` 与 `:shared:compileTestKotlinJs`，均通过。
 - Kotlin daemon 因沙箱无法写入用户目录而报 `AccessDeniedException`，Gradle 自动回退到非 daemon 编译并成功，不属于源码编译失败。
 - `:shared:jsTest` 仍在 `compileTestDevelopmentExecutableKotlinJs` 阶段触发既有 Kuikly/Kotlin JS IR 错误：`IrSimpleFunctionSymbolImpl is already bound`（`/callKotlinMethod`）。
+- 修复响应式渲染后执行 `:shared:compileKotlinJs` 与 `:shared:compileDebugKotlinAndroid`，均通过。
 
 ## 下一步
 
