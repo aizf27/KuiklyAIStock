@@ -562,19 +562,21 @@ internal fun ViewContainer<*, *>.StockSearchInput(
                 marginRight(12f)
             }
         }
-        com.tencent.kuikly.core.views.Input {
+        Input {
             attr {
-                text(value)
-                hint(placeholder)
-                hintColor(StockDesignTokens.tertiaryText)
-                fontSize(14f)
-                color(StockDesignTokens.primaryText)
                 flex(1f)
-                singleLine()
+                height(44f)
+                text(value)
+                placeholder(placeholder)
+                placeholderColor(StockDesignTokens.tertiaryText)
+                color(StockDesignTokens.primaryText)
+                fontSize(14f)
+                returnKeyTypeSearch()
+                imeNoFullscreen(true)
             }
             event {
-                textChange { onTextChange(it) }
-                submit { onSubmit(it) }
+                textDidChange(isSyncEdit = true) { params -> onTextChange(params.text) }
+                inputReturn { params -> onSubmit(params.text) }
             }
         }
     }
