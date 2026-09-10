@@ -537,3 +537,45 @@ internal object WatchlistTabs {
     const val WATCHLIST = "自选股"
     const val HOLDINGS = "持仓股"
 }
+
+// 搜索输入框组件
+internal fun ViewContainer<*, *>.StockSearchInput(
+    value: String,
+    placeholder: String,
+    onTextChange: (String) -> Unit,
+    onSubmit: (String) -> Unit,
+) {
+    View {
+        attr {
+            height(44f)
+            backgroundColor(StockDesignTokens.controlBackground)
+            borderRadius(12f)
+            flexDirectionRow()
+            alignItemsCenter()
+            padding(left = 14f, right = 14f)
+        }
+        Text {
+            attr {
+                text("⌕")
+                fontSize(22f)
+                color(StockDesignTokens.secondaryText)
+                marginRight(12f)
+            }
+        }
+        com.tencent.kuikly.core.views.Input {
+            attr {
+                text(value)
+                hint(placeholder)
+                hintColor(StockDesignTokens.tertiaryText)
+                fontSize(14f)
+                color(StockDesignTokens.primaryText)
+                flex(1f)
+                singleLine()
+            }
+            event {
+                textChange { onTextChange(it) }
+                submit { onSubmit(it) }
+            }
+        }
+    }
+}

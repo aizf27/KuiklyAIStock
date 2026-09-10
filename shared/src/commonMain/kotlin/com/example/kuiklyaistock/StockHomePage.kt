@@ -237,66 +237,45 @@ private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
                     alignSelfCenter()
                     paddingBottom(StockDesignTokens.pageBottomSpacing)
                 }
-                // 自选股列表
-                vif({ page.quotes.any { it.code in page.favoriteCodes } }) {
-                    // 列表工具栏：显示数量、排序、编辑
-                    StockWatchlistToolbar(page)
-                    // 股票列表
-                    StockWatchlistQuoteList(page)
-                    // 底部更新时间
-                    StockWatchlistFooter(page)
+                // 自选股 Tab 内容
+                vif({ page.selectedWatchlistTab == WatchlistTabs.WATCHLIST }) {
+                    // 自选股列表
+                    vif({ page.quotes.any { it.code in page.favoriteCodes } }) {
+                        // 列表工具栏：显示数量、排序、编辑
+                        StockWatchlistToolbar(page)
+                        // 股票列表
+                        StockWatchlistQuoteList(page)
+                        // 底部更新时间
+                        StockWatchlistFooter(page)
+                    }
+                    // 空状态
+                    vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
+                        StockWatchlistEmptyState(page)
+                    }
                 }
-                // 空状态
-                vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
-                    StockWatchlistEmptyState(page)
+                // 持仓股 Tab 内容（暂无演示数据）
+                vif({ page.selectedWatchlistTab == WatchlistTabs.HOLDINGS }) {
+                    StockHoldingsEmptyState(page)
                 }
             }
         }
     }
 }
 
-// 自选页顶部区域：标题 + 搜索框
+// 自选页顶部区域：搜索框
 private fun ViewContainer<*, *>.StockWatchlistTopArea(page: StockHomePage) {
     View {
         attr {
             backgroundColor(StockDesignTokens.surface)
             padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 12f)
         }
-        Text {
-            attr {
-                text("自选")
-                fontSize(20f)
-                fontWeightBold()
-                color(StockDesignTokens.primaryText)
-                marginBottom(12f)
-            }
-        }
         // 搜索框
-        View {
-            attr {
-                height(44f)
-                backgroundColor(StockDesignTokens.controlBackground)
-                borderRadius(12f)
-                flexDirectionRow()
-                alignItemsCenter()
-                padding(left = 14f, right = 14f)
-            }
-            Text {
-                attr {
-                    text("⌕")
-                    fontSize(22f)
-                    color(StockDesignTokens.secondaryText)
-                    marginRight(12f)
-                }
-            }
-            Text {
-                attr {
-                    text("搜索股票名称或代码")
-                    fontSize(14f)
-                    color(StockDesignTokens.tertiaryText)
-                }
-            }
-        }
+        StockSearchInput(
+            page.searchText,
+            "搜索股票名称或代码",
+            { page.updateSearchText(it) },
+            { page.submitSearch(it) }
+        )
     }
 }
 
@@ -470,6 +449,35 @@ private fun ViewContainer<*, *>.StockWatchlistEmptyState(page: StockHomePage) {
                 fontSize(11f)
                 color(StockDesignTokens.tertiaryText)
                 marginTop(20f)
+            }
+        }
+    }
+}
+
+// 持仓股空状态（暂无演示数据）
+private fun ViewContainer<*, *>.StockHoldingsEmptyState(page: StockHomePage) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(12f)
+            padding(top = 48f, bottom = 48f)
+            marginTop(64f)
+            allCenter()
+        }
+        Text {
+            attr {
+                text("暂无演示数据")
+                fontSize(18f)
+                fontWeightBold()
+                color(StockDesignTokens.primaryText)
+            }
+        }
+        Text {
+            attr {
+                text("持仓股功能尚未开放")
+                fontSize(14f)
+                color(StockDesignTokens.secondaryText)
+                marginTop(14f)
             }
         }
     }
