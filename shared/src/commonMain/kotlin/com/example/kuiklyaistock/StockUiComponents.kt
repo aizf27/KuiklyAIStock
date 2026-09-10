@@ -175,7 +175,7 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
                     attr {
                         text(formatStockSigned(quote.change))
                         fontSize(13f)
-                        fontWeightSemi()
+                        fontWeightSemiBold()
                         color(stockChangeColor(quote.change))
                     }
                 }
@@ -190,7 +190,7 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
                     attr {
                         text(formatStockPercent(quote.changePercent))
                         fontSize(13f)
-                        fontWeightSemi()
+                        fontWeightSemiBold()
                         color(stockChangeColor(quote.change))
                     }
                 }
@@ -507,7 +507,7 @@ internal fun ViewContainer<*, *>.StockWatchlistTabs(
                         width(40f)
                         height(3f)
                         backgroundColor(StockDesignTokens.brand)
-                        cornerRadius(2f)
+                        borderRadius(2f)
                     }
                 }
             }
@@ -524,7 +524,7 @@ internal fun ViewContainer<*, *>.StockWatchlistTabs(
                         width(40f)
                         height(3f)
                         backgroundColor(StockDesignTokens.brand)
-                        cornerRadius(2f)
+                        borderRadius(2f)
                     }
                 }
             }
