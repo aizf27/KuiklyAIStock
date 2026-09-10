@@ -13,6 +13,7 @@ import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockRequestTracker
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
+import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.coroutines.launch
@@ -218,42 +219,257 @@ internal class StockHomePage : BasePager() {
 }
 
 private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
-    Scroller {
+    View {
         attr { flex(1f) }
-        View {
-            attr {
-                width(page.stockContentWidth())
-                alignSelfCenter()
-                paddingBottom(StockDesignTokens.pageBottomSpacing)
-            }
-            // 自选股 / 持仓股 Tab 切换
-            StockWatchlistTabs(page.stockContentWidth(), { page.selectedWatchlistTab }) { tab ->
-                page.selectedWatchlistTab = tab
-                page.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 切换Tab: $tab")
-            }
+        // 顶部搜索区域（包含页面标题和搜索框）
+        StockWatchlistTopArea(page)
+        // 自选股 / 持仓股 Tab 切换
+        StockWatchlistTabs(page.stockContentWidth(), { page.selectedWatchlistTab }) { tab ->
+            page.selectedWatchlistTab = tab
+            page.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 切换Tab: $tab")
+        }
+        // 滚动内容区域
+        Scroller {
+            attr { flex(1f) }
             View {
                 attr {
-                    padding(top = 12f)
+                    width(page.stockContentWidth())
+                    alignSelfCenter()
+                    paddingBottom(StockDesignTokens.pageBottomSpacing)
                 }
-                Text { attr { text("我的自选"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
-                Text { attr { text("本地收藏 · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
-                StockMarketSummary(page.marketSummary, page.stockContentWidth())
-                // 使用自选页专用的表头，显示三列数据
-                StockWatchlistQuoteHeader(page.stockContentWidth())
-                page.quotes.forEach { quote ->
-                    vif({ quote.code in page.favoriteCodes }) {
-                        // 使用自选页专用的股票行，显示三列数据
-                        StockWatchlistQuoteRow(
-                            quote,
-                            page.stockContentWidth(),
-                            { quote.code in page.favoriteCodes },
-                            { page.toggleFavorite(quote.code) },
-                        ) { page.openDetail(quote.code) }
-                    }
+                // 自选股列表
+                vif({ page.quotes.any { it.code in page.favoriteCodes } }) {
+                    // 列表工具栏：显示数量、排序、编辑
+                    StockWatchlistToolbar(page)
+                    // 股票列表
+                    StockWatchlistQuoteList(page)
+                    // 底部更新时间
+                    StockWatchlistFooter(page)
                 }
+                // 空状态
                 vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
-                    StockInlineEmptyState("暂无自选股票", "去行情添加") { page.selectedTab = StockTabs.MARKET }
+                    StockWatchlistEmptyState(page)
                 }
+            }
+        }
+    }
+}
+
+// 自选页顶部区域：标题 + 搜索框
+private fun ViewContainer<*, *>.StockWatchlistTopArea(page: StockHomePage) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 12f)
+        }
+        Text {
+            attr {
+                text("自选")
+                fontSize(20f)
+                fontWeightBold()
+                color(StockDesignTokens.primaryText)
+                marginBottom(12f)
+            }
+        }
+        // 搜索框
+        View {
+            attr {
+                height(44f)
+                backgroundColor(StockDesignTokens.controlBackground)
+                borderRadius(12f)
+                flexDirectionRow()
+                alignItemsCenter()
+                padding(left = 14f, right = 14f)
+            }
+            Text {
+                attr {
+                    text("⌕")
+                    fontSize(22f)
+                    color(StockDesignTokens.secondaryText)
+                    marginRight(12f)
+                }
+            }
+            Text {
+                attr {
+                    text("搜索股票名称或代码")
+                    fontSize(14f)
+                    color(StockDesignTokens.tertiaryText)
+                }
+            }
+        }
+    }
+}
+
+// 列表工具栏：自选数量、排序、编辑
+private fun ViewContainer<*, *>.StockWatchlistToolbar(page: StockHomePage) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(12f)
+            height(52f)
+            flexDirectionRow()
+            alignItemsCenter()
+            padding(left = 16f, right = 16f)
+            marginTop(12f)
+        }
+        val count = page.quotes.count { it.code in page.favoriteCodes }
+        Text {
+            attr {
+                text("自选股票  $count")
+                fontSize(14f)
+                fontWeightBold()
+                color(StockDesignTokens.primaryText)
+                flex(1f)
+            }
+        }
+        Text {
+            attr {
+                text("默认排序  ⇅")
+                fontSize(12f)
+                fontWeightMedium()
+                color(StockDesignTokens.brand)
+                marginRight(16f)
+            }
+        }
+        Text {
+            attr {
+                text("编辑")
+                fontSize(12f)
+                fontWeightMedium()
+                color(StockDesignTokens.brand)
+            }
+        }
+    }
+}
+
+// 股票列表
+private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(12f)
+            marginTop(8f)
+        }
+        // 使用自选页专用的表头，显示三列数据
+        StockWatchlistQuoteHeader(page.stockContentWidth())
+        // 表头分割线
+        View {
+            attr {
+                height(1f)
+                backgroundColor(StockDesignTokens.divider)
+                marginLeft(16f)
+            }
+        }
+        page.quotes.forEach { quote ->
+            vif({ quote.code in page.favoriteCodes }) {
+                // 使用自选页专用的股票行，显示三列数据
+                StockWatchlistQuoteRow(
+                    quote,
+                    page.stockContentWidth(),
+                    { quote.code in page.favoriteCodes },
+                    { page.toggleFavorite(quote.code) },
+                ) { page.openDetail(quote.code) }
+            }
+        }
+    }
+}
+
+// 底部更新时间
+private fun ViewContainer<*, *>.StockWatchlistFooter(page: StockHomePage) {
+    View {
+        attr {
+            flexDirectionRow()
+            alignItemsCenter()
+            marginTop(12f)
+        }
+        Text {
+            attr {
+                text("行情更新时间  2026-09-09 15:00  ·  演示数据")
+                fontSize(11f)
+                color(StockDesignTokens.tertiaryText)
+                flex(1f)
+            }
+        }
+        Text {
+            attr {
+                text("↻")
+                fontSize(14f)
+                color(StockDesignTokens.tertiaryText)
+            }
+        }
+    }
+}
+
+// 空状态
+private fun ViewContainer<*, *>.StockWatchlistEmptyState(page: StockHomePage) {
+    View {
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(12f)
+            padding(top = 48f, bottom = 48f)
+            marginTop(64f)
+            allCenter()
+        }
+        // 空状态图标底
+        View {
+            attr {
+                width(80f)
+                height(80f)
+                backgroundColor(StockDesignTokens.brandBackground)
+                borderRadius(40f)
+                allCenter()
+            }
+            Text {
+                attr {
+                    text("☆")
+                    fontSize(42f)
+                    color(StockDesignTokens.brand)
+                }
+            }
+        }
+        Text {
+            attr {
+                text("暂无自选股票")
+                fontSize(18f)
+                fontWeightBold()
+                color(StockDesignTokens.primaryText)
+                marginTop(20f)
+            }
+        }
+        Text {
+            attr {
+                text("去行情页收藏感兴趣的股票")
+                fontSize(14f)
+                color(StockDesignTokens.secondaryText)
+                marginTop(14f)
+            }
+        }
+        // 去行情添加按钮
+        View {
+            attr {
+                width(136f)
+                height(44f)
+                backgroundColor(StockDesignTokens.brand)
+                borderRadius(12f)
+                allCenter()
+                marginTop(28f)
+            }
+            event { click { page.selectedTab = StockTabs.MARKET } }
+            Text {
+                attr {
+                    text("去行情添加  →")
+                    fontSize(14f)
+                    fontWeightMedium()
+                    color(Color.WHITE)
+                }
+            }
+        }
+        Text {
+            attr {
+                text("也可直接用上方搜索框查找")
+                fontSize(11f)
+                color(StockDesignTokens.tertiaryText)
+                marginTop(20f)
             }
         }
     }
