@@ -45,6 +45,32 @@ internal fun formatStockTurnover(value: Double): String =
     if (value >= 100_000_000) "${formatStockUnitValue(value / 100_000_000.0)}亿"
     else "${formatStockUnitValue(value / 10_000.0)}万"
 
+// 自选页使用的表头，显示三列数据：最新价、涨跌、涨跌幅
+internal fun ViewContainer<*, *>.StockWatchlistQuoteHeader(width: Float) {
+    View {
+        attr {
+            width(width)
+            flexDirectionRow()
+            padding(left = StockDesignTokens.minimumTouchTarget, right = 4f, top = 12f, bottom = 8f)
+            alignItemsCenter()
+        }
+        Text { attr { text("名称 / 代码"); fontSize(11f); color(StockDesignTokens.tertiaryText); flex(1f) } }
+        View {
+            attr { width(50f); alignItemsFlexEnd(); marginRight(8f) }
+            Text { attr { text("最新价"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+        }
+        View {
+            attr { width(50f); alignItemsFlexEnd(); marginRight(8f) }
+            Text { attr { text("涨跌"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+        }
+        View {
+            attr { width(60f); alignItemsFlexEnd() }
+            Text { attr { text("涨跌幅"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+        }
+    }
+}
+
+// 行情页使用的表头，显示两列数据：最新价、涨跌幅
 internal fun ViewContainer<*, *>.StockQuoteListHeader(width: Float) {
     View {
         attr {
@@ -59,7 +85,128 @@ internal fun ViewContainer<*, *>.StockQuoteListHeader(width: Float) {
         }
     }
 }
-// 可复用的股票列表行，星标和整行点击分别交给页面处理。
+// 自选页专用的股票行，显示三列数据：最新价、涨跌、涨跌幅
+internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
+    quote: StockQuote,
+    width: Float,
+    favorite: () -> Boolean = { false },
+    onFavorite: () -> Unit = {},
+    onClick: () -> Unit,
+) {
+    View {
+        attr {
+            width(width)
+            height(StockDesignTokens.quoteRowHeight)
+            backgroundColor(StockDesignTokens.surface)
+            padding(right = 4f)
+            flexDirectionRow()
+            alignItemsCenter()
+        }
+        event {
+            click { onClick() }
+        }
+        View {
+            attr {
+                width(StockDesignTokens.minimumTouchTarget)
+                height(StockDesignTokens.minimumTouchTarget)
+                allCenter()
+            }
+            event { click { onFavorite() } }
+            Text {
+                attr {
+                    text(if (favorite()) "★" else "☆")
+                    fontSize(20f)
+                    color(if (favorite()) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
+                }
+            }
+        }
+        View {
+            attr {
+                flex(1f)
+                flexDirectionRow()
+                alignItemsCenter()
+            }
+            View {
+                attr {
+                    flex(1f)
+                    marginRight(8f)
+                }
+                Text {
+                    attr {
+                        text(quote.name)
+                        fontSize(16f)
+                        fontWeightBold()
+                        color(StockDesignTokens.primaryText)
+                    }
+                }
+                Text {
+                    attr {
+                        text(quote.code)
+                        fontSize(11f)
+                        color(StockDesignTokens.secondaryText)
+                        marginTop(3f)
+                    }
+                }
+            }
+            // 最新价列
+            View {
+                attr {
+                    width(50f)
+                    alignItemsFlexEnd()
+                    marginRight(8f)
+                }
+                Text {
+                    attr {
+                        text(formatStockPrice(quote.price))
+                        fontSize(14f)
+                        fontWeightBold()
+                        color(stockChangeColor(quote.change))
+                    }
+                }
+            }
+            // 涨跌列（绝对值）
+            View {
+                attr {
+                    width(50f)
+                    alignItemsFlexEnd()
+                    marginRight(8f)
+                }
+                Text {
+                    attr {
+                        text(formatStockSigned(quote.change))
+                        fontSize(13f)
+                        fontWeightSemi()
+                        color(stockChangeColor(quote.change))
+                    }
+                }
+            }
+            // 涨跌幅列
+            View {
+                attr {
+                    width(60f)
+                    alignItemsFlexEnd()
+                }
+                Text {
+                    attr {
+                        text(formatStockPercent(quote.changePercent))
+                        fontSize(13f)
+                        fontWeightSemi()
+                        color(stockChangeColor(quote.change))
+                    }
+                }
+            }
+        }
+    }
+    View {
+        attr {
+            height(1f)
+            backgroundColor(StockDesignTokens.divider)
+            marginLeft(StockDesignTokens.minimumTouchTarget)
+        }
+    }
+}
+
+// 行情页使用的股票列表行，星标和整行点击分别交给页面处理。
 internal fun ViewContainer<*, *>.StockQuoteRow(
     quote: StockQuote,
     width: Float,
@@ -290,4 +437,103 @@ internal fun ViewContainer<*, *>.StockRetryBanner(
             Text { attr { text("重试"); fontSize(13f); fontWeightBold(); color(StockDesignTokens.brand) } }
         }
     }
+}
+
+// 自选页的 Tab 切换组件：自选股 / 持仓股
+internal fun ViewContainer<*, *>.StockWatchlistTabs(
+    width: Float,
+    selectedTab: () -> String,
+    onTabSelected: (String) -> Unit,
+) {
+    View {
+        attr {
+            width(width)
+            height(48f)
+            backgroundColor(StockDesignTokens.surface)
+            flexDirectionRow()
+            alignItemsCenter()
+        }
+        // 自选股 Tab
+        View {
+            attr {
+                flex(1f)
+                height(48f)
+                allCenter()
+            }
+            event { click { onTabSelected(WatchlistTabs.WATCHLIST) } }
+            Text {
+                attr {
+                    text("自选股")
+                    fontSize(16f)
+                    if (selectedTab() == WatchlistTabs.WATCHLIST) fontWeightBold() else fontWeightMedium()
+                    color(if (selectedTab() == WatchlistTabs.WATCHLIST) StockDesignTokens.primaryText else StockDesignTokens.secondaryText)
+                }
+            }
+        }
+        // 持仓股 Tab
+        View {
+            attr {
+                flex(1f)
+                height(48f)
+                allCenter()
+            }
+            event { click { onTabSelected(WatchlistTabs.HOLDINGS) } }
+            Text {
+                attr {
+                    text("持仓股")
+                    fontSize(16f)
+                    if (selectedTab() == WatchlistTabs.HOLDINGS) fontWeightBold() else fontWeightMedium()
+                    color(if (selectedTab() == WatchlistTabs.HOLDINGS) StockDesignTokens.primaryText else StockDesignTokens.secondaryText)
+                }
+            }
+        }
+    }
+    // 选中指示线
+    View {
+        attr {
+            width(width)
+            height(3f)
+            flexDirectionRow()
+        }
+        View {
+            attr {
+                flex(1f)
+                height(3f)
+                allCenter()
+            }
+            if (selectedTab() == WatchlistTabs.WATCHLIST) {
+                View {
+                    attr {
+                        width(40f)
+                        height(3f)
+                        backgroundColor(StockDesignTokens.brand)
+                        cornerRadius(2f)
+                    }
+                }
+            }
+        }
+        View {
+            attr {
+                flex(1f)
+                height(3f)
+                allCenter()
+            }
+            if (selectedTab() == WatchlistTabs.HOLDINGS) {
+                View {
+                    attr {
+                        width(40f)
+                        height(3f)
+                        backgroundColor(StockDesignTokens.brand)
+                        cornerRadius(2f)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 自选页的 Tab 常量
+internal object WatchlistTabs {
+    const val WATCHLIST = "自选股"
+    const val HOLDINGS = "持仓股"
 }

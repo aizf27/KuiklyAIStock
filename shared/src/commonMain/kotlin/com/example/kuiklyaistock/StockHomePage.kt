@@ -37,6 +37,7 @@ internal class StockHomePage : BasePager() {
     internal var favoriteCodes by observable(emptySet<String>())
     internal var selectedTab by observable(StockTabs.MARKET)
     internal var selectedMarketCategory by observable(StockMarketCategories.MARKET)
+    internal var selectedWatchlistTab by observable(WatchlistTabs.WATCHLIST)
     internal var searchText by observable("")
     internal var currentMinuteOfDay by observable(15 * 60)
     internal var currentClockText by observable("--:--")
@@ -223,24 +224,36 @@ private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
             attr {
                 width(page.stockContentWidth())
                 alignSelfCenter()
-                padding(top = 12f, bottom = StockDesignTokens.pageBottomSpacing)
+                paddingBottom(StockDesignTokens.pageBottomSpacing)
             }
-            Text { attr { text("我的自选"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
-            Text { attr { text("本地收藏 · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
-            StockMarketSummary(page.marketSummary, page.stockContentWidth())
-            StockQuoteListHeader(page.stockContentWidth())
-            page.quotes.forEach { quote ->
-                vif({ quote.code in page.favoriteCodes }) {
-                    StockQuoteRow(
-                        quote,
-                        page.stockContentWidth(),
-                        { quote.code in page.favoriteCodes },
-                        { page.toggleFavorite(quote.code) },
-                    ) { page.openDetail(quote.code) }
+            // 自选股 / 持仓股 Tab 切换
+            StockWatchlistTabs(page.stockContentWidth(), { page.selectedWatchlistTab }) { tab ->
+                page.selectedWatchlistTab = tab
+                page.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 切换Tab: $tab")
+            }
+            View {
+                attr {
+                    padding(top = 12f)
                 }
-            }
-            vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
-                StockInlineEmptyState("暂无自选股票", "去行情添加") { page.selectedTab = StockTabs.MARKET }
+                Text { attr { text("我的自选"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+                Text { attr { text("本地收藏 · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
+                StockMarketSummary(page.marketSummary, page.stockContentWidth())
+                // 使用自选页专用的表头，显示三列数据
+                StockWatchlistQuoteHeader(page.stockContentWidth())
+                page.quotes.forEach { quote ->
+                    vif({ quote.code in page.favoriteCodes }) {
+                        // 使用自选页专用的股票行，显示三列数据
+                        StockWatchlistQuoteRow(
+                            quote,
+                            page.stockContentWidth(),
+                            { quote.code in page.favoriteCodes },
+                            { page.toggleFavorite(quote.code) },
+                        ) { page.openDetail(quote.code) }
+                    }
+                }
+                vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
+                    StockInlineEmptyState("暂无自选股票", "去行情添加") { page.selectedTab = StockTabs.MARKET }
+                }
             }
         }
     }
