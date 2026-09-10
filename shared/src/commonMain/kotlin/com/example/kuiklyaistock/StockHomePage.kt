@@ -2,22 +2,24 @@ package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
 import com.example.kuiklyaistock.base.BridgeModule
+import com.example.kuiklyaistock.base.setTimeout
 import com.example.kuiklyaistock.model.AiMarketOverview
 import com.example.kuiklyaistock.model.AiStockInsight
 import com.example.kuiklyaistock.model.MarketSummary
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
-import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockLoadResult
+import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockRequestTracker
 import com.example.kuiklyaistock.repository.WatchlistStore
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.coroutines.launch
-import com.tencent.kuikly.core.directives.vif
-import com.tencent.kuikly.core.directives.velseif
 import com.tencent.kuikly.core.directives.velse
+import com.tencent.kuikly.core.directives.velseif
+import com.tencent.kuikly.core.directives.vif
+import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
@@ -34,16 +36,26 @@ internal class StockHomePage : BasePager() {
     private var errorMessage by observable("")
     internal var favoriteCodes by observable(emptySet<String>())
     internal var selectedTab by observable(StockTabs.MARKET)
+    internal var selectedMarketCategory by observable(StockMarketCategories.MARKET)
+    internal var searchText by observable("")
+    internal var currentMinuteOfDay by observable(15 * 60)
+    internal var currentClockText by observable("--:--")
+    internal var currentDateText by observable("")
     private var removeWatchlistObserver: (() -> Unit)? = null
     private val contentRequests = StockRequestTracker()
+    private var marketClockActive = false
 
     override fun created() {
         super.created()
+        marketClockActive = true
         removeWatchlistObserver = WatchlistStore.subscribe { favoriteCodes = it }
+        refreshMarketClock()
+        scheduleMarketClockRefresh()
         loadContent()
     }
 
     override fun onDestroyPager() {
+        marketClockActive = false
         contentRequests.invalidate()
         removeWatchlistObserver?.invoke()
         removeWatchlistObserver = null
@@ -54,7 +66,20 @@ internal class StockHomePage : BasePager() {
         val ctx = this
         return {
             attr { backgroundColor(StockDesignTokens.pageBackground) }
-            StockTopBar(ctx, { if (ctx.selectedTab == StockTabs.AI) "AI 解读" else "AI 股票" }, false)
+            StockTopBar(
+                ctx,
+                {
+                    when (ctx.selectedTab) {
+                        StockTabs.WATCHLIST -> "自选"
+                        StockTabs.AI -> "AI 解读"
+                        else -> "行情"
+                    }
+                },
+                false,
+            )
+            vif({ ctx.selectedTab == StockTabs.MARKET }) {
+                StockMarketHomeHeader(ctx)
+            }
             vif({ ctx.loading && !ctx.hasSelectedTabContent() }) {
                 StockLoadingState("正在加载演示数据...")
             }
@@ -66,13 +91,16 @@ internal class StockHomePage : BasePager() {
                     StockRetryBanner(ctx.errorMessage) { ctx.loadContent() }
                 }
                 vif({ ctx.selectedTab == StockTabs.AI }) {
-                    StockAiContent(ctx.overview, ctx.insights) { ctx.openDetail(it) }
+                    StockAiContent(ctx.overview, ctx.insights, ctx.stockContentWidth()) { ctx.openDetail(it) }
+                }
+                velseif({ ctx.selectedTab == StockTabs.WATCHLIST }) {
+                    StockWatchlistContent(ctx)
                 }
                 velse {
-                    StockMarketContent(ctx)
+                    StockMarketHomeContent(ctx)
                 }
             }
-            StockBottomBar({ ctx.selectedTab }) { tab ->
+            StockBottomBar(ctx, { ctx.selectedTab }) { tab ->
                 if (ctx.selectedTab != tab) {
                     ctx.selectedTab = tab
                     ctx.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 切换根Tab: $tab")
@@ -94,8 +122,9 @@ internal class StockHomePage : BasePager() {
             }
             when (homeResult) {
                 is StockLoadResult.Success -> {
-                    quotes = homeResult.data.quotes
+                    // 先写入概览，再展示行情内容，避免首次渲染停留在同步状态。
                     marketSummary = homeResult.data.marketSummary
+                    quotes = homeResult.data.quotes
                 }
                 StockLoadResult.Empty -> errorMessage = "暂无行情数据"
                 is StockLoadResult.Failure -> errorMessage = homeResult.message
@@ -123,8 +152,58 @@ internal class StockHomePage : BasePager() {
         }
     }
 
-    private fun hasSelectedTabContent(): Boolean =
-        if (selectedTab == StockTabs.AI) overview != null || insights.isNotEmpty() else quotes.isNotEmpty()
+    private fun refreshMarketClock() {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val timestamp = bridge.currentTimeStamp()
+        if (timestamp <= 0L) return
+        val timeText = bridge.dateFormatter(timestamp, "HH:mm")
+        val timeParts = timeText.split(":")
+        val hour = timeParts.getOrNull(0)?.toIntOrNull()
+        val minute = timeParts.getOrNull(1)?.toIntOrNull()
+        if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
+            currentMinuteOfDay = hour * 60 + minute
+            currentClockText = timeText
+        }
+        bridge.dateFormatter(timestamp, "MM-dd").takeIf { it.isNotEmpty() }?.let { currentDateText = it }
+    }
+
+    private fun scheduleMarketClockRefresh() {
+        setTimeout(60_000) {
+            if (marketClockActive) {
+                refreshMarketClock()
+                scheduleMarketClockRefresh()
+            }
+        }
+    }
+
+    private fun hasSelectedTabContent(): Boolean = when (selectedTab) {
+        StockTabs.AI -> overview != null || insights.isNotEmpty()
+        else -> marketSummary != null && quotes.isNotEmpty()
+    }
+
+    internal fun filteredMarketQuotes(): List<StockQuote> {
+        val query = searchText.trim().lowercase()
+        return quotes
+            .filter { it.code.length == 6 }
+            .filter { query.isEmpty() || it.name.lowercase().contains(query) || it.code.lowercase().contains(query) }
+    }
+
+    internal fun updateSearchText(text: String) {
+        searchText = text
+    }
+
+    internal fun submitSearch(text: String) {
+        searchText = text
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).closeKeyboard(JSONObject())
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 提交搜索: ${text.trim()}")
+    }
+
+    internal fun selectMarketCategory(category: String) {
+        if (selectedMarketCategory != category) {
+            selectedMarketCategory = category
+            acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 切换行情分类: $category")
+        }
+    }
 
     internal fun openDetail(code: String) {
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 跳转详情: $code")
@@ -137,28 +216,32 @@ internal class StockHomePage : BasePager() {
     }
 }
 
-private fun ViewContainer<*, *>.StockMarketContent(page: StockHomePage) {
+private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
     Scroller {
-        attr { flex(1f); padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 20f) }
-        Text { attr { text(if (page.selectedTab == StockTabs.WATCHLIST) "我的自选" else "全部行情"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
-        Text { attr { text("${page.marketSummary?.sessionStatus ?: "数据同步中"} · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
-        StockMarketSummary(page.marketSummary)
-        StockQuoteListHeader()
-        page.quotes.forEach { quote ->
-            vif({ page.selectedTab != StockTabs.WATCHLIST || quote.code in page.favoriteCodes }) {
-                StockQuoteRow(quote, { quote.code in page.favoriteCodes }, { page.toggleFavorite(quote.code) }) { page.openDetail(quote.code) }
+        attr { flex(1f) }
+        View {
+            attr {
+                width(page.stockContentWidth())
+                alignSelfCenter()
+                padding(top = 12f, bottom = StockDesignTokens.pageBottomSpacing)
+            }
+            Text { attr { text("我的自选"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+            Text { attr { text("本地收藏 · 演示数据"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
+            StockMarketSummary(page.marketSummary, page.stockContentWidth())
+            StockQuoteListHeader(page.stockContentWidth())
+            page.quotes.forEach { quote ->
+                vif({ quote.code in page.favoriteCodes }) {
+                    StockQuoteRow(
+                        quote,
+                        page.stockContentWidth(),
+                        { quote.code in page.favoriteCodes },
+                        { page.toggleFavorite(quote.code) },
+                    ) { page.openDetail(quote.code) }
+                }
+            }
+            vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
+                StockInlineEmptyState("暂无自选股票", "去行情添加") { page.selectedTab = StockTabs.MARKET }
             }
         }
-        vif({ page.selectedTab == StockTabs.WATCHLIST && page.quotes.none { it.code in page.favoriteCodes } }) {
-            StockInlineEmptyState("暂无自选股票", "去行情添加") { page.selectedTab = StockTabs.MARKET }
-        }
-    }
-}
-
-private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockQuoteListHeader() {
-    View {
-        attr { flexDirectionRow(); padding(left = StockDesignTokens.minimumTouchTarget, right = 4f, bottom = 6f) }
-        Text { attr { text("名称 / 代码"); fontSize(11f); color(StockDesignTokens.tertiaryText); flex(1f) } }
-        View { attr { width(112f); alignItemsFlexEnd() }; Text { attr { text("最新 / 涨跌幅"); fontSize(11f); color(StockDesignTokens.tertiaryText) } } }
     }
 }

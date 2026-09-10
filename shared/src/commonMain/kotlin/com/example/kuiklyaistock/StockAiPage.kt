@@ -11,25 +11,37 @@ import com.tencent.kuikly.core.views.View
 internal fun ViewContainer<*, *>.StockAiContent(
     overview: AiMarketOverview?,
     insights: List<AiStockInsight>,
+    contentWidth: Float,
     onStockClick: (String) -> Unit,
 ) {
     Scroller {
-        attr { flex(1f); padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 20f) }
-        Text { attr { text("市场观点"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
-        Text { attr { text("观点参考 · 演示数据，不构成投资建议"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
-        overview?.let { AiMarketOverviewCard(it) }
-        Text { attr { text("重点股票"); fontSize(17f); fontWeightBold(); color(StockDesignTokens.primaryText); marginTop(20f); marginBottom(8f) } }
-        if (insights.isEmpty()) {
-            StockInlineEmptyState("暂无重点股票解读", "返回行情") { }
-        } else {
-            insights.forEach { insight -> AiStockInsightCard(insight) { onStockClick(insight.quote.code) } }
+        attr { flex(1f) }
+        View {
+            attr {
+                width(contentWidth)
+                alignSelfCenter()
+                padding(top = 12f, bottom = StockDesignTokens.pageBottomSpacing)
+            }
+            Text { attr { text("市场观点"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+            Text { attr { text("观点参考 · 演示数据，不构成投资建议"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
+            overview?.let { AiMarketOverviewCard(it) }
+            Text { attr { text("重点股票"); fontSize(17f); fontWeightBold(); color(StockDesignTokens.primaryText); marginTop(StockDesignTokens.pageSectionSpacing); marginBottom(8f) } }
+            if (insights.isEmpty()) {
+                StockInlineEmptyState("暂无重点股票解读", "返回行情") { }
+            } else {
+                insights.forEach { insight -> AiStockInsightCard(insight) { onStockClick(insight.quote.code) } }
+            }
         }
     }
 }
 
 private fun ViewContainer<*, *>.AiMarketOverviewCard(overview: AiMarketOverview) {
     View {
-        attr { backgroundColor(StockDesignTokens.surface); borderRadius(StockDesignTokens.sectionRadius); padding(16f) }
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(StockDesignTokens.sectionRadius)
+            padding(StockDesignTokens.cardPadding)
+        }
         Text { attr { text("市场事实与观点"); fontSize(12f); fontWeightBold(); color(StockDesignTokens.brand) } }
         Text { attr { text(overview.title); fontSize(19f); fontWeightBold(); color(StockDesignTokens.primaryText); marginTop(6f) } }
         Text { attr { text("观点判断：${overview.sentiment}"); fontSize(13f); color(StockDesignTokens.secondaryText); marginTop(10f) } }
@@ -41,7 +53,12 @@ private fun ViewContainer<*, *>.AiMarketOverviewCard(overview: AiMarketOverview)
 
 private fun ViewContainer<*, *>.AiStockInsightCard(insight: AiStockInsight, onClick: () -> Unit) {
     View {
-        attr { backgroundColor(StockDesignTokens.surface); borderRadius(StockDesignTokens.sectionRadius); padding(14f); marginBottom(8f) }
+        attr {
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(StockDesignTokens.sectionRadius)
+            padding(StockDesignTokens.cardPadding)
+            marginBottom(8f)
+        }
         event { click { onClick() } }
         Text { attr { text(insight.quote.name); fontSize(16f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
         Text { attr { text("${insight.quote.code} · ${insight.analysis.applicablePeriod}"); fontSize(11f); color(StockDesignTokens.secondaryText); marginTop(3f) } }

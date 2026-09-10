@@ -5,32 +5,43 @@ import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.module.RouterModule
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import kotlin.math.max
 
-// 股票页面统一顶部栏，避免复用模板渐变导航栏。
+internal fun BasePager.stockTopInset(): Float =
+    max(pagerData.statusBarHeight, pagerData.safeAreaInsets.top)
+
+internal fun BasePager.stockBottomInset(): Float =
+    max(pagerData.androidBottomBavBarHeight, pagerData.safeAreaInsets.bottom)
+
+internal fun BasePager.stockContentWidth(): Float =
+    (pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f).coerceAtLeast(0f)
+
+// 股票页面统一顶部栏，标题和返回按钮始终位于系统安全区下方。
 internal fun ViewContainer<*, *>.StockTopBar(
     pager: BasePager,
     title: () -> String,
     showBack: Boolean,
 ) {
+    val topInset = pager.stockTopInset()
     View {
         attr {
-            height(52f)
+            height(topInset + StockDesignTokens.topBarContentHeight)
             backgroundColor(StockDesignTokens.surface)
         }
+        View { attr { height(topInset) } }
         View {
             attr {
-                flex(1f)
+                height(StockDesignTokens.topBarContentHeight - 1f)
                 flexDirectionRow()
                 alignItemsCenter()
-                padding(left = 4f, right = 16f)
             }
-            if (showBack) {
-                View {
-                    attr {
-                        width(44f)
-                        height(44f)
-                        allCenter()
-                    }
+            View {
+                attr {
+                    width(StockDesignTokens.minimumTouchTarget)
+                    height(StockDesignTokens.minimumTouchTarget)
+                    allCenter()
+                }
+                if (showBack) {
                     event { click { pager.acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage() } }
                     Text {
                         attr {
@@ -51,10 +62,11 @@ internal fun ViewContainer<*, *>.StockTopBar(
                     textAlignCenter()
                 }
             }
-            if (showBack) {
-                View { attr { width(44f) } }
-            } else {
-                View { attr { width(4f) } }
+            View {
+                attr {
+                    width(StockDesignTokens.minimumTouchTarget)
+                    height(StockDesignTokens.minimumTouchTarget)
+                }
             }
         }
         View { attr { height(1f); backgroundColor(StockDesignTokens.divider) } }

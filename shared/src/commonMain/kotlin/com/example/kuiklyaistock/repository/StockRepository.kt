@@ -53,79 +53,79 @@ class MockStockRepository(
 ) : StockRepository {
     private val details: List<StockDetail> = listOf(
         stock(
-            name = "腾讯控股",
-            code = "00700",
-            price = 382.40,
-            change = 6.80,
-            changePercent = 1.81,
-            open = 375.60,
-            previousClose = 375.60,
-            high = 386.20,
-            low = 374.60,
-            volume = 18_320_000,
-            turnover = 6_982_000_000.0,
-            trend = listOf(375.2, 377.8, 376.4, 380.1, 379.6, 383.0, 382.4),
-            dailyTrend = listOf(362.0, 365.5, 368.2, 371.6, 374.9, 378.1, 382.4),
+            name = "中科曙光",
+            code = "603019",
+            price = 74.28,
+            change = 5.80,
+            changePercent = 8.46,
+            open = 69.10,
+            previousClose = 68.48,
+            high = 75.20,
+            low = 68.80,
+            volume = 28_600_000,
+            turnover = 2_124_000_000.0,
+            trend = listOf(68.6, 69.8, 70.4, 72.1, 73.6, 74.9, 74.28),
+            dailyTrend = listOf(64.8, 66.2, 67.0, 68.4, 70.1, 72.6, 74.28),
         ),
         stock(
-            name = "贵州茅台",
-            code = "600519",
-            price = 1_682.00,
-            change = -12.00,
-            changePercent = -0.71,
-            open = 1_698.50,
-            previousClose = 1_694.00,
-            high = 1_704.50,
-            low = 1_668.80,
-            volume = 2_140_000,
-            turnover = 3_610_000_000.0,
-            trend = listOf(1702.0, 1696.4, 1688.2, 1691.5, 1680.0, 1686.5, 1682.0),
-            dailyTrend = listOf(1724.0, 1712.0, 1706.5, 1698.0, 1689.0, 1686.5, 1682.0),
+            name = "工业富联",
+            code = "601138",
+            price = 26.91,
+            change = 1.70,
+            changePercent = 6.72,
+            open = 25.40,
+            previousClose = 25.21,
+            high = 27.20,
+            low = 25.18,
+            volume = 46_200_000,
+            turnover = 1_243_000_000.0,
+            trend = listOf(25.3, 25.6, 26.0, 26.3, 26.7, 27.0, 26.91),
+            dailyTrend = listOf(23.8, 24.2, 24.6, 24.9, 25.3, 26.1, 26.91),
         ),
         stock(
             name = "宁德时代",
             code = "300750",
-            price = 214.76,
-            change = 4.26,
-            changePercent = 2.02,
-            open = 210.50,
-            previousClose = 210.50,
-            high = 216.80,
-            low = 208.30,
-            volume = 12_870_000,
-            turnover = 2_745_000_000.0,
-            trend = listOf(208.3, 209.7, 211.4, 210.2, 213.5, 215.8, 214.76),
-            dailyTrend = listOf(202.6, 205.0, 207.8, 209.2, 211.5, 213.0, 214.76),
-        ),
-        stock(
-            name = "中国平安",
-            code = "601318",
-            price = 48.63,
-            change = -0.37,
-            changePercent = -0.76,
-            open = 49.05,
-            previousClose = 49.00,
-            high = 49.20,
-            low = 48.15,
-            volume = 9_540_000,
-            turnover = 464_000_000.0,
-            trend = listOf(49.12, 48.96, 48.74, 48.82, 48.44, 48.76, 48.63),
-            dailyTrend = listOf(50.20, 49.80, 49.36, 49.12, 48.88, 48.74, 48.63),
+            price = 211.37,
+            change = 10.42,
+            changePercent = 5.19,
+            open = 202.60,
+            previousClose = 200.95,
+            high = 213.40,
+            low = 201.80,
+            volume = 18_870_000,
+            turnover = 3_984_000_000.0,
+            trend = listOf(201.8, 204.2, 205.6, 207.8, 209.5, 212.0, 211.37),
+            dailyTrend = listOf(193.8, 196.1, 198.4, 201.2, 204.8, 208.3, 211.37),
         ),
         stock(
             name = "比亚迪",
             code = "002594",
-            price = 246.18,
-            change = 3.18,
-            changePercent = 1.31,
-            open = 243.10,
-            previousClose = 243.00,
-            high = 248.60,
-            low = 241.90,
-            volume = 8_260_000,
-            turnover = 2_028_000_000.0,
-            trend = listOf(242.1, 243.6, 245.0, 244.2, 246.8, 247.3, 246.18),
-            dailyTrend = listOf(238.0, 240.6, 241.2, 242.8, 244.0, 245.4, 246.18),
+            price = 102.66,
+            change = -2.43,
+            changePercent = -2.31,
+            open = 104.20,
+            previousClose = 105.09,
+            high = 104.80,
+            low = 101.90,
+            volume = 22_260_000,
+            turnover = 2_287_000_000.0,
+            trend = listOf(104.8, 104.2, 103.9, 103.4, 102.8, 102.4, 102.66),
+            dailyTrend = listOf(108.2, 107.4, 106.3, 105.8, 104.9, 103.7, 102.66),
+        ),
+        stock(
+            name = "东方财富",
+            code = "300059",
+            price = 24.80,
+            change = 0.93,
+            changePercent = 3.88,
+            open = 24.02,
+            previousClose = 23.87,
+            high = 25.16,
+            low = 23.90,
+            volume = 35_540_000,
+            turnover = 1_672_000_000.0,
+            trend = listOf(23.9, 24.1, 24.2, 24.5, 24.7, 24.9, 24.8),
+            dailyTrend = listOf(22.7, 23.0, 23.4, 23.6, 24.0, 24.4, 24.8),
         ),
     )
 
@@ -138,7 +138,7 @@ class MockStockRepository(
             factSummary = "腾讯控股日内震荡上行，样本市场情绪偏积极。",
             applicablePeriod = "短线 1-5 日",
             evidenceSummary = "价格位于日内高位附近，成交量较前段放大。",
-            updatedAt = "2026-09-07 15:00",
+            updatedAt = "2026-09-10 15:00",
             isDemo = true,
         ),
         "600519" to AiAnalysis(
@@ -149,7 +149,7 @@ class MockStockRepository(
             factSummary = "贵州茅台小幅回调，防守情绪占优。",
             applicablePeriod = "短线 1-5 日",
             evidenceSummary = "价格低于今开，日内反弹未突破早盘高点。",
-            updatedAt = "2026-09-07 15:00",
+            updatedAt = "2026-09-10 15:00",
             isDemo = true,
         ),
         "300750" to AiAnalysis(
@@ -160,7 +160,7 @@ class MockStockRepository(
             factSummary = "宁德时代放量反弹，新能源方向活跃。",
             applicablePeriod = "短线 1-5 日",
             evidenceSummary = "价格高于今开，日内量价同步回升。",
-            updatedAt = "2026-09-07 15:00",
+            updatedAt = "2026-09-10 15:00",
             isDemo = true,
         ),
         "601318" to AiAnalysis(
@@ -171,7 +171,7 @@ class MockStockRepository(
             factSummary = "中国平安横盘整理，资金观望明显。",
             applicablePeriod = "短线 1-5 日",
             evidenceSummary = "价格靠近日内低位，成交量未出现明显放大。",
-            updatedAt = "2026-09-07 15:00",
+            updatedAt = "2026-09-10 15:00",
             isDemo = true,
         ),
         "002594" to AiAnalysis(
@@ -182,7 +182,7 @@ class MockStockRepository(
             factSummary = "比亚迪温和反弹，市场关注度回升。",
             applicablePeriod = "短线 1-5 日",
             evidenceSummary = "价格高于昨收，午后保持温和上行。",
-            updatedAt = "2026-09-07 15:00",
+            updatedAt = "2026-09-10 15:00",
             isDemo = true,
         ),
     )
@@ -192,22 +192,24 @@ class MockStockRepository(
         forcedResult<StockHomeData>(StockRequestType.HOME)?.let { return it }
         val quotes = details.map { it.quote }
         if (quotes.isEmpty()) return StockLoadResult.Empty
-        return StockLoadResult.Success(StockHomeData(quotes, createMarketSummary(quotes)))
+        return StockLoadResult.Success(StockHomeData(quotes, createMarketSummary(quotes.filter { it.code.length == 6 })))
     }
 
     private fun createMarketSummary(quotes: List<StockQuote>): MarketSummary {
         return MarketSummary(
-            totalCount = quotes.size,
-            risingCount = quotes.count { it.isRising },
-            fallingCount = quotes.count { it.isFalling },
-            flatCount = quotes.count { !it.isRising && !it.isFalling },
+            totalCount = 5_436,
+            risingCount = 1_794,
+            fallingCount = 3_642,
+            flatCount = 0,
             sessionStatus = "已收盘",
-            sampleTurnoverAmount = details.sumOf { it.turnover },
+            sampleTurnoverAmount = 1_873_100_000_000.0,
+            sampleNetInflowAmount = -10_665_000_000.0,
             indices = listOf(
-                MarketIndexQuote("上证指数", "000001", 3_280.12, 13.66, 0.42, "2026-09-07 15:00"),
-                MarketIndexQuote("深证成指", "399001", 10_456.20, -18.85, -0.18, "2026-09-07 15:00"),
+                MarketIndexQuote("上证指数", "000001", 3_951.51, 10.96, 0.28, "2026-09-10 15:00"),
+                MarketIndexQuote("深证成指", "399001", 13_723.32, 20.11, 0.15, "2026-09-10 15:00"),
+                MarketIndexQuote("创业板指", "399006", 3_354.97, -4.75, -0.14, "2026-09-10 15:00"),
             ),
-            updatedAt = quotes.firstOrNull()?.updatedAt.orEmpty(),
+            updatedAt = "2026-09-10 15:00",
         )
     }
 
@@ -217,14 +219,14 @@ class MockStockRepository(
         val normalized = code.trim()
         val detail = details.firstOrNull { it.quote.code == normalized }
             ?: return StockLoadResult.Empty
-        return StockLoadResult.Success(StockDetailData(detail, analyses[normalized]))
+        return StockLoadResult.Success(StockDetailData(detail, analyses[normalized] ?: createDefaultAnalysis(detail)))
     }
 
     override suspend fun loadAi(scope: CoroutineScope): StockLoadResult<StockAiData> {
         scope.waitForMockResponse()
         forcedResult<StockAiData>(StockRequestType.AI)?.let { return it }
-        val insights = details.mapNotNull { detail ->
-            analyses[detail.quote.code]?.let { analysis -> AiStockInsight(detail.quote, analysis) }
+        val insights = details.map { detail ->
+            AiStockInsight(detail.quote, analyses[detail.quote.code] ?: createDefaultAnalysis(detail))
         }
         if (insights.isEmpty()) return StockLoadResult.Empty
         return StockLoadResult.Success(StockAiData(createAiMarketOverview(), insights))
@@ -235,7 +237,19 @@ class MockStockRepository(
         sentiment = "谨慎乐观",
         summary = "样本股票中科技与新能源方向表现较强，权重消费和金融仍处于整理阶段。",
         riskTip = "关注高位波动、板块轮动加快和成交量回落风险。",
-        updatedAt = "2026-09-07 15:00",
+        updatedAt = "2026-09-10 15:00",
+    )
+
+    private fun createDefaultAnalysis(detail: StockDetail): AiAnalysis = AiAnalysis(
+        trendJudgement = "样本走势随市场波动，当前仅用于界面演示。",
+        focusPoint = "关注成交量变化、关键价位和所属板块强弱。",
+        riskReminder = "Mock 数据不构成投资建议，真实交易需结合最新公告与行情。",
+        signalInterpretation = "当前信号来自本地样本数据，不代表真实量化结论。",
+        factSummary = "${detail.quote.name}当前样本涨跌幅为${detail.quote.changePercent}%。",
+        applicablePeriod = "界面演示",
+        evidenceSummary = "价格、成交量和走势图均为确定性 Mock 数据。",
+        updatedAt = "2026-09-10 15:00",
+        isDemo = true,
     )
 
     private suspend fun CoroutineScope.waitForMockResponse() {
@@ -265,7 +279,7 @@ class MockStockRepository(
         trend: List<Double>,
         dailyTrend: List<Double>,
     ): StockDetail {
-        val quote = StockQuote(name, code, price, change, changePercent, "2026-09-07 15:00")
+        val quote = StockQuote(name, code, price, change, changePercent, "2026-09-10 15:00")
         return StockDetail(
             quote = quote,
             open = open,

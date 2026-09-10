@@ -17,9 +17,22 @@ internal object StockDesignTokens {
     val risk = Color(0xFFB54708)
     val warningBackground = Color(0xFFFFFAEB)
     val brandBackground = Color(0xFFF0F5FF)
+    val riseBackground = Color(0xFFFFF1F1)
+    val fallBackground = Color(0xFFEDF8F3)
+    val controlBackground = Color(0xFFF0F2F5)
+    val informationCardBackground = Color(0xFFE9EDF3)
+    val informationCardShadow = Color(0xFFD7DEE8)
+    val transparent = Color(0x00000000)
 
     const val pageHorizontalPadding = 16f
-    const val sectionRadius = 8f
+    const val pageBottomSpacing = 24f
+    const val pageSectionSpacing = 24f
+    const val sectionSpacing = 16f
+    const val cardPadding = 16f
+    const val sectionRadius = 12f
+    const val topBarContentHeight = 52f
+    const val bottomBarContentHeight = 64f
     const val quoteRowHeight = 68f
+    const val quoteValueColumnWidth = 112f
     const val minimumTouchTarget = 44f
 }

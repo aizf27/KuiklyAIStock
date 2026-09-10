@@ -11,26 +11,31 @@ internal object StockTabs {
     const val MARKET = "行情"
     const val WATCHLIST = "自选"
     const val AI = "AI解读"
-
 }
 
-// 应用底部主导航，页面只负责处理 Tab 选择后的业务动作。
+// 应用底部主导航，安全区独立占位，避免图标和文字落入系统手势区域。
 internal fun ViewContainer<*, *>.StockBottomBar(
+    pager: BasePager,
     selectedTab: () -> String,
     onTabSelected: (String) -> Unit,
 ) {
+    val bottomInset = pager.stockBottomInset()
     View {
         attr {
-            height(64f)
+            height(StockDesignTokens.bottomBarContentHeight + bottomInset)
             backgroundColor(StockDesignTokens.surface)
         }
         View { attr { height(1f); backgroundColor(StockDesignTokens.divider) } }
         View {
-            attr { flex(1f); flexDirectionRow() }
+            attr {
+                height(StockDesignTokens.bottomBarContentHeight - 1f)
+                flexDirectionRow()
+            }
             StockTabItem("⌁", StockTabs.MARKET, { selectedTab() == StockTabs.MARKET }, onTabSelected)
             StockTabItem("♡", StockTabs.WATCHLIST, { selectedTab() == StockTabs.WATCHLIST }, onTabSelected)
             StockTabItem("✦", StockTabs.AI, { selectedTab() == StockTabs.AI }, onTabSelected)
         }
+        View { attr { height(bottomInset) } }
     }
 }
 
@@ -46,9 +51,7 @@ private fun ViewContainer<*, *>.StockTabItem(
             allCenter()
             backgroundColor(StockDesignTokens.surface)
         }
-        event {
-            click { onTabSelected(title) }
-        }
+        event { click { onTabSelected(title) } }
         Text {
             attr {
                 text(icon)

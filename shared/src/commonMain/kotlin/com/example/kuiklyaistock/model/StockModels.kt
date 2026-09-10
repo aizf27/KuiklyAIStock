@@ -24,6 +24,7 @@ data class MarketSummary(
     val flatCount: Int,
     val sessionStatus: String,
     val sampleTurnoverAmount: Double,
+    val sampleNetInflowAmount: Double,
     val indices: List<MarketIndexQuote>,
     val updatedAt: String,
 )

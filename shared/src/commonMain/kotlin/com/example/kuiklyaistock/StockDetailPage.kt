@@ -63,73 +63,74 @@ internal class StockDetailPage : BasePager() {
             velse {
                 ctx.detail?.let { stock ->
                     Scroller {
-                        attr {
-                            flex(1f)
-                            padding(
-                                left = StockDesignTokens.pageHorizontalPadding,
-                                right = StockDesignTokens.pageHorizontalPadding,
-                                top = 12f,
-                                bottom = 24f,
-                            )
-                        }
-                        StockDetailIdentity(stock, { ctx.isFavorite(stock.quote.code) }) {
-                            ctx.toggleFavorite(stock.quote.code)
-                        }
-                        StockPricePanel(stock)
-                        Text {
-                            attr {
-                                text("关键行情")
-                                fontSize(17f)
-                                fontWeightBold()
-                                color(StockDesignTokens.primaryText)
-                                marginTop(20f)
-                                marginBottom(8f)
-                            }
-                        }
-                        StockMetricsPanel(stock)
+                        attr { flex(1f) }
                         View {
                             attr {
-                                flexDirectionRow()
-                                alignItemsCenter()
-                                marginTop(20f)
-                                marginBottom(8f)
+                                width(ctx.stockContentWidth())
+                                alignSelfCenter()
+                                padding(
+                                    top = 12f,
+                                    bottom = StockDesignTokens.pageBottomSpacing + ctx.stockBottomInset(),
+                                )
                             }
+                            StockDetailIdentity(stock, { ctx.isFavorite(stock.quote.code) }) {
+                                ctx.toggleFavorite(stock.quote.code)
+                            }
+                            StockPricePanel(stock, ctx.stockContentWidth())
                             Text {
                                 attr {
-                                    text("走势")
+                                    text("关键行情")
                                     fontSize(17f)
                                     fontWeightBold()
                                     color(StockDesignTokens.primaryText)
-                                    flex(1f)
+                                    marginTop(StockDesignTokens.pageSectionSpacing)
+                                    marginBottom(8f)
                                 }
                             }
-                            StockTrendPeriodSelector({ ctx.selectedChartPeriod }) { period ->
-                                ctx.selectChartPeriod(period)
+                            StockMetricsPanel(stock, ctx.stockContentWidth())
+                            View {
+                                attr {
+                                    flexDirectionRow()
+                                    alignItemsCenter()
+                                    marginTop(StockDesignTokens.pageSectionSpacing)
+                                    marginBottom(8f)
+                                }
+                                Text {
+                                    attr {
+                                        text("走势")
+                                        fontSize(17f)
+                                        fontWeightBold()
+                                        color(StockDesignTokens.primaryText)
+                                        flex(1f)
+                                    }
+                                }
+                                StockTrendPeriodSelector({ ctx.selectedChartPeriod }) { period ->
+                                    ctx.selectChartPeriod(period)
+                                }
                             }
+                            vif({ ctx.selectedChartPeriod == StockChartPeriod.INTRADAY }) {
+                                StockTrendChart(
+                                    points = stock.intradayTrend,
+                                    width = ctx.stockContentWidth(),
+                                    previousClose = stock.previousClose,
+                                    change = stock.quote.change,
+                                )
+                            }
+                            velse {
+                                StockTrendChart(
+                                    points = stock.dailyTrend,
+                                    width = ctx.stockContentWidth(),
+                                    previousClose = stock.previousClose,
+                                    change = stock.quote.change,
+                                )
+                            }
+                            AiAnalysisSection(ctx.analysis)
                         }
-                        vif({ ctx.selectedChartPeriod == StockChartPeriod.INTRADAY }) {
-                            StockTrendChart(
-                                points = stock.intradayTrend,
-                                width = ctx.pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f,
-                                previousClose = stock.previousClose,
-                                change = stock.quote.change,
-                            )
-                        }
-                        velse {
-                            StockTrendChart(
-                                points = stock.dailyTrend,
-                                width = ctx.pagerData.pageViewWidth - StockDesignTokens.pageHorizontalPadding * 2f,
-                                previousClose = stock.previousClose,
-                                change = stock.quote.change,
-                            )
-                        }
-                        AiAnalysisSection(ctx.analysis)
                     }
                 }
             }
         }
     }
-
     private fun loadDetail() {
         val code = pagerData.params.optString("code").trim()
         if (code.isEmpty()) {
@@ -239,11 +240,13 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockDetailIdentity
     }
 }
 
-private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(stock: StockDetail) {
+private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(stock: StockDetail, width: Float) {
     View {
         attr {
+            width(width)
             backgroundColor(StockDesignTokens.surface)
-            padding(16f)
+            borderRadius(StockDesignTokens.sectionRadius)
+            padding(StockDesignTokens.cardPadding)
         }
         View {
             attr {
@@ -286,11 +289,13 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(sto
     }
 }
 
-private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockMetricsPanel(stock: StockDetail) {
+private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockMetricsPanel(stock: StockDetail, width: Float) {
     View {
         attr {
+            width(width)
             backgroundColor(StockDesignTokens.surface)
-            padding(left = 14f, right = 14f, top = 14f, bottom = 2f)
+            borderRadius(StockDesignTokens.sectionRadius)
+            padding(left = StockDesignTokens.cardPadding, right = StockDesignTokens.cardPadding, top = StockDesignTokens.cardPadding, bottom = 2f)
         }
         View {
             attr { flexDirectionRow() }

@@ -13,7 +13,7 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
             fontSize(17f)
             fontWeightBold()
             color(StockDesignTokens.primaryText)
-            marginTop(20f)
+            marginTop(StockDesignTokens.pageSectionSpacing)
             marginBottom(8f)
         }
     }
@@ -30,7 +30,7 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(analysis: AiAnalysis?) {
             attr {
                 backgroundColor(StockDesignTokens.surface)
                 borderRadius(StockDesignTokens.sectionRadius)
-                padding(14f)
+                padding(StockDesignTokens.cardPadding)
             }
             Text {
                 attr {

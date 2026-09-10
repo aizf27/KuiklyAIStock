@@ -50,6 +50,7 @@ internal fun ViewContainer<*, *>.StockTrendChart(
     if (points.isEmpty()) {
         View {
             attr {
+                width(width)
                 height(180f)
                 backgroundColor(StockDesignTokens.surface)
                 borderRadius(StockDesignTokens.sectionRadius)
@@ -71,12 +72,13 @@ internal fun ViewContainer<*, *>.StockTrendChart(
     val maxPrice = (prices.maxOrNull() ?: previousClose).coerceAtLeast(previousClose)
     val currentPrice = points.last().price
     val lineColor = stockChangeColor(change)
-    val canvasWidth = (width - 24f).coerceAtLeast(1f)
+    val canvasWidth = (width - StockDesignTokens.cardPadding * 2f).coerceAtLeast(1f)
     View {
         attr {
+            width(width)
             backgroundColor(StockDesignTokens.surface)
             borderRadius(StockDesignTokens.sectionRadius)
-            padding(left = 12f, right = 12f, top = 12f, bottom = 10f)
+            padding(StockDesignTokens.cardPadding)
         }
         View {
             attr { flexDirectionRow() }

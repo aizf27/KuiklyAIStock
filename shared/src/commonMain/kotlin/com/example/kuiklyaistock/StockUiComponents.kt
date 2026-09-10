@@ -45,18 +45,34 @@ internal fun formatStockTurnover(value: Double): String =
     if (value >= 100_000_000) "${formatStockUnitValue(value / 100_000_000.0)}亿"
     else "${formatStockUnitValue(value / 10_000.0)}万"
 
+internal fun ViewContainer<*, *>.StockQuoteListHeader(width: Float) {
+    View {
+        attr {
+            width(width)
+            flexDirectionRow()
+            padding(left = StockDesignTokens.minimumTouchTarget, right = 4f, top = 12f, bottom = 8f)
+        }
+        Text { attr { text("名称 / 代码"); fontSize(11f); color(StockDesignTokens.tertiaryText); flex(1f) } }
+        View {
+            attr { width(StockDesignTokens.quoteValueColumnWidth); alignItemsFlexEnd() }
+            Text { attr { text("最新 / 涨跌幅"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+        }
+    }
+}
 // 可复用的股票列表行，星标和整行点击分别交给页面处理。
 internal fun ViewContainer<*, *>.StockQuoteRow(
     quote: StockQuote,
+    width: Float,
     favorite: () -> Boolean = { false },
     onFavorite: () -> Unit = {},
     onClick: () -> Unit,
 ) {
     View {
         attr {
+            width(width)
             height(StockDesignTokens.quoteRowHeight)
             backgroundColor(StockDesignTokens.surface)
-            padding(left = 4f, right = 4f)
+            padding(right = 4f)
             flexDirectionRow()
             alignItemsCenter()
         }
@@ -85,7 +101,10 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
                 alignItemsCenter()
             }
             View {
-                attr { flex(1f) }
+                attr {
+                    flex(1f)
+                    marginRight(8f)
+                }
                 Text {
                     attr {
                         text(quote.name)
@@ -105,8 +124,9 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
             }
             View {
                 attr {
-                    width(112f)
+                    width(StockDesignTokens.quoteValueColumnWidth)
                     alignItemsFlexEnd()
+                    marginRight(3f)
                 }
                 Text {
                     attr {
@@ -122,6 +142,7 @@ internal fun ViewContainer<*, *>.StockQuoteRow(
                         fontSize(12f)
                         color(stockChangeColor(quote.change))
                         marginTop(3f)
+
                     }
                 }
             }
@@ -184,7 +205,7 @@ internal fun ViewContainer<*, *>.StockStateText(
                     text(actionTitle)
                     fontSize(14f)
                     fontWeightBold()
-                color(StockDesignTokens.brand)
+                    color(StockDesignTokens.brand)
                     marginTop(14f)
                 }
                 event {
@@ -258,7 +279,7 @@ internal fun ViewContainer<*, *>.StockRetryBanner(
     View {
         attr {
             backgroundColor(StockDesignTokens.warningBackground)
-            padding(left = StockDesignTokens.pageHorizontalPadding, right = 8f, top = 8f, bottom = 8f)
+            padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 8f, bottom = 8f)
             flexDirectionRow()
             alignItemsCenter()
         }
