@@ -1,0 +1,311 @@
+package com.example.kuiklyaistock.repository
+
+import com.example.kuiklyaistock.base.BridgeModule
+import com.example.kuiklyaistock.model.AiAnalysis
+import com.example.kuiklyaistock.model.AiAnalysisSource
+import com.example.kuiklyaistock.model.AiObservationPlan
+import com.example.kuiklyaistock.model.AiRiskLevel
+import com.example.kuiklyaistock.model.AiSignal
+import com.example.kuiklyaistock.model.AiTrendType
+import com.example.kuiklyaistock.model.StockDetail
+import com.tencent.kuikly.core.nvi.serialization.json.JSONArray
+import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
+
+internal enum class AiAnalysisErrorType {
+    CONFIG,
+    AUTH,
+    BALANCE,
+    RATE_LIMIT,
+    INVALID_REQUEST,
+    SERVER,
+    NETWORK,
+    FORMAT,
+}
+
+internal sealed class AiAnalysisLoadResult {
+    data class Success(val analysis: AiAnalysis) : AiAnalysisLoadResult()
+    data class Failure(val type: AiAnalysisErrorType, val message: String) : AiAnalysisLoadResult()
+    data object Unsupported : AiAnalysisLoadResult()
+}
+
+internal data class AiAnalysisRequest(
+    val stockCode: String,
+    val modelName: String,
+    val systemPrompt: String,
+    val userPrompt: String,
+)
+
+internal sealed class AiTransportResult {
+    data class Success(
+        val content: String,
+        val modelName: String,
+        val requestId: String,
+        val generatedAt: String,
+    ) : AiTransportResult()
+
+    data class Failure(
+        val statusCode: Int,
+        val errorType: String,
+        val message: String,
+    ) : AiTransportResult()
+}
+
+internal interface AiAnalysisTransport {
+    fun isSupported(): Boolean
+    suspend fun request(request: AiAnalysisRequest): AiTransportResult
+}
+
+internal interface AiAnalysisRepository {
+    suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult
+}
+
+internal class MockAiAnalysisRepository : AiAnalysisRepository {
+    override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult =
+        AiAnalysisLoadResult.Success(createMockAiAnalysis(detail))
+}
+
+internal class BridgeAiAnalysisTransport(
+    private val bridgeModule: BridgeModule,
+) : AiAnalysisTransport {
+    override fun isSupported(): Boolean = bridgeModule.supportsAiAnalysis()
+
+    override suspend fun request(request: AiAnalysisRequest): AiTransportResult {
+        val response = bridgeModule.requestAiAnalysis(
+            JSONObject()
+                .put("stockCode", request.stockCode)
+                .put("modelName", request.modelName)
+                .put("systemPrompt", request.systemPrompt)
+                .put("userPrompt", request.userPrompt)
+        ) ?: return AiTransportResult.Failure(0, "NETWORK", "AI 服务未返回结果")
+        return if (response.optBoolean("ok")) {
+            AiTransportResult.Success(
+                content = response.optString("content"),
+                modelName = response.optString("modelName"),
+                requestId = response.optString("requestId"),
+                generatedAt = response.optString("generatedAt"),
+            )
+        } else {
+            AiTransportResult.Failure(
+                statusCode = response.optInt("statusCode"),
+                errorType = response.optString("errorType"),
+                message = response.optString("message"),
+            )
+        }
+    }
+}
+
+internal class RemoteAiAnalysisRepository(
+    private val transport: AiAnalysisTransport,
+    private val modelName: String = DEFAULT_MODEL,
+    private val schemaVersion: String = SCHEMA_VERSION,
+    private val promptVersion: String = PROMPT_VERSION,
+) : AiAnalysisRepository {
+    override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult {
+        if (!transport.isSupported()) return AiAnalysisLoadResult.Unsupported
+        val cacheKey = listOf(detail.quote.code, detail.quote.updatedAt, modelName, promptVersion, schemaVersion).joinToString("|")
+        AiAnalysisMemoryCache.get(cacheKey)?.let {
+            return AiAnalysisLoadResult.Success(it.copy(source = AiAnalysisSource.CACHE))
+        }
+        val request = buildRequest(detail)
+        return when (val result = transport.request(request)) {
+            is AiTransportResult.Success -> parseRemoteAnalysis(detail, result).also { parsed ->
+                if (parsed is AiAnalysisLoadResult.Success) {
+                    AiAnalysisMemoryCache.put(cacheKey, parsed.analysis)
+                }
+            }
+            is AiTransportResult.Failure -> AiAnalysisLoadResult.Failure(
+                type = mapFailure(result),
+                message = result.message.ifBlank { defaultErrorMessage(mapFailure(result)) },
+            )
+        }
+    }
+
+    private fun buildRequest(detail: StockDetail): AiAnalysisRequest {
+        val systemPrompt = """
+            你是股票行情演示产品的结构化分析助手。必须只输出合法 JSON 对象，不要 Markdown、代码块或额外说明。
+            行情可能是演示数据，不得宣称实时，不得给出买卖指令、收益承诺或确定性预测。
+            schema=$schemaVersion。枚举：trendType=STRONG|SIDEWAYS|WEAK，riskLevel=LOW|MEDIUM|HIGH。
+            signals 最多 3 条，primaryRisks 最多 2 条。observationPlan 无合理计划时返回 null。
+            JSON 结构必须为：
+            {"trendType":"STRONG|SIDEWAYS|WEAK","trendJudgement":"文本","factSummary":"文本",
+            "applicablePeriod":"文本","observationPlan":null或{"focusRangeLow":正数,"focusRangeHigh":正数,
+            "confirmationCondition":"文本","confirmationPrice":正数或null,"referenceTarget":正数或null,"riskBoundary":"文本"},
+            "signals":[{"title":"文本","status":"文本","explanation":"文本","evidence":"文本"}],
+            "riskLevel":"LOW|MEDIUM|HIGH","primaryRisks":["文本"],"invalidationCondition":"文本"}。
+        """.trimIndent()
+        val intraday = detail.intradayTrend.joinToString("；") { "${it.label}:${it.price}" }
+        val daily = detail.dailyTrend.joinToString("；") { "${it.label}:${it.price}" }
+        val userPrompt = """
+            请基于以下演示行情生成 JSON 分析：
+            名称=${detail.quote.name}，代码=${detail.quote.code}，行情时间=${detail.quote.updatedAt}
+            当前价=${detail.quote.price}，涨跌=${detail.quote.change}，涨跌幅=${detail.quote.changePercent}%
+            今开=${detail.open}，昨收=${detail.previousClose}，最高=${detail.high}，最低=${detail.low}
+            成交量=${detail.volume}，成交额=${detail.turnover}
+            分时样本=$intraday
+            日K样本=$daily
+        """.trimIndent()
+        return AiAnalysisRequest(detail.quote.code, modelName, systemPrompt, userPrompt)
+    }
+
+    private fun parseRemoteAnalysis(detail: StockDetail, result: AiTransportResult.Success): AiAnalysisLoadResult {
+        if (result.content.isBlank()) return formatFailure("AI 返回内容为空")
+        return try {
+            val root = JSONObject(result.content)
+            val trendType = enumValue<AiTrendType>(root.optString("trendType"))
+                ?: return formatFailure("趋势枚举无效")
+            val riskLevel = enumValue<AiRiskLevel>(root.optString("riskLevel"))
+                ?: return formatFailure("风险枚举无效")
+            val trendJudgement = requiredText(root, "trendJudgement", 160) ?: return formatFailure("综合判断无效")
+            val factSummary = requiredText(root, "factSummary", 240) ?: return formatFailure("事实摘要无效")
+            val applicablePeriod = requiredText(root, "applicablePeriod", 24) ?: return formatFailure("适用周期无效")
+            val invalidationCondition = requiredText(root, "invalidationCondition", 180)
+                ?: return formatFailure("失效条件无效")
+            val observationPlan = parseObservationPlan(root.optJSONObject("observationPlan"))
+            if (observationPlan is Parsed.Invalid) return formatFailure(observationPlan.message)
+            val signals = parseSignals(root.optJSONArray("signals")) ?: return formatFailure("信号字段无效")
+            val risks = parseRisks(root.optJSONArray("primaryRisks")) ?: return formatFailure("风险字段无效")
+            val plan = (observationPlan as Parsed.Valid).value
+            val focusPoint = plan?.confirmationCondition ?: "暂无明确观察计划"
+            val riskReminder = risks.firstOrNull() ?: invalidationCondition
+            val signalInterpretation = signals.joinToString("；") { it.explanation }.ifBlank { "暂无结构化信号" }
+            val evidenceSummary = signals.joinToString("；") { it.evidence }.ifBlank { factSummary }
+            AiAnalysisLoadResult.Success(
+                AiAnalysis(
+                    trendJudgement = trendJudgement,
+                    focusPoint = focusPoint,
+                    riskReminder = riskReminder,
+                    signalInterpretation = signalInterpretation,
+                    factSummary = factSummary,
+                    applicablePeriod = applicablePeriod,
+                    evidenceSummary = evidenceSummary,
+                    updatedAt = detail.quote.updatedAt,
+                    isDemo = false,
+                    trendType = trendType,
+                    riskLevel = riskLevel,
+                    primaryRisks = risks,
+                    invalidationCondition = invalidationCondition,
+                    observationPlan = plan,
+                    signals = signals,
+                    source = AiAnalysisSource.REMOTE,
+                    modelName = result.modelName.ifBlank { modelName },
+                    generatedAt = result.generatedAt,
+                    requestId = result.requestId.ifBlank { null },
+                )
+            )
+        } catch (_: Throwable) {
+            formatFailure("AI 返回内容不是合法 JSON")
+        }
+    }
+
+    private fun parseObservationPlan(value: JSONObject?): Parsed<AiObservationPlan?> {
+        if (value == null) return Parsed.Valid(null)
+        val low = value.optDouble("focusRangeLow", Double.NaN)
+        val high = value.optDouble("focusRangeHigh", Double.NaN)
+        val condition = requiredText(value, "confirmationCondition", 180)
+            ?: return Parsed.Invalid("观察条件无效")
+        val boundary = requiredText(value, "riskBoundary", 180)
+            ?: return Parsed.Invalid("风险边界无效")
+        val confirmationPrice = optionalPositive(value, "confirmationPrice")
+            ?: if (hasNonNullValue(value, "confirmationPrice")) return Parsed.Invalid("确认价格无效") else null
+        val referenceTarget = optionalPositive(value, "referenceTarget")
+            ?: if (hasNonNullValue(value, "referenceTarget")) return Parsed.Invalid("参考目标无效") else null
+        if (!low.isFinite() || !high.isFinite() || low <= 0.0 || high <= 0.0 || low > high) {
+            return Parsed.Invalid("观察价格区间无效")
+        }
+        return Parsed.Valid(AiObservationPlan(low, high, condition, confirmationPrice, referenceTarget, boundary))
+    }
+
+    private fun parseSignals(array: JSONArray?): List<AiSignal>? {
+        if (array == null || array.length() > 3) return null
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: return null
+                add(
+                    AiSignal(
+                        title = requiredText(item, "title", 24) ?: return null,
+                        status = requiredText(item, "status", 24) ?: return null,
+                        explanation = requiredText(item, "explanation", 180) ?: return null,
+                        evidence = requiredText(item, "evidence", 240) ?: return null,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun parseRisks(array: JSONArray?): List<String>? {
+        if (array == null || array.length() > 2) return null
+        return buildList {
+            for (index in 0 until array.length()) {
+                val value = array.optString(index)?.trim().orEmpty()
+                if (value.isEmpty() || value.length > 180) return null
+                add(value)
+            }
+        }
+    }
+
+    private fun requiredText(json: JSONObject, key: String, maxLength: Int): String? =
+        json.optString(key).trim().takeIf { it.isNotEmpty() && it.length <= maxLength }
+
+    private fun optionalPositive(json: JSONObject, key: String): Double? {
+        if (!hasNonNullValue(json, key)) return null
+        val value = json.optDouble(key, Double.NaN)
+        return value.takeIf { it.isFinite() && it > 0.0 }
+    }
+
+    private fun hasNonNullValue(json: JSONObject, key: String): Boolean {
+        val value = json.opt(key) ?: return false
+        return value.toString() != "null"
+    }
+
+    private inline fun <reified T : Enum<T>> enumValue(value: String): T? =
+        enumValues<T>().firstOrNull { it.name == value.trim() }
+
+    private fun mapFailure(result: AiTransportResult.Failure): AiAnalysisErrorType = when {
+        result.errorType.equals("CONFIG", true) -> AiAnalysisErrorType.CONFIG
+        result.statusCode == 401 || result.errorType.equals("AUTH", true) -> AiAnalysisErrorType.AUTH
+        result.statusCode == 402 || result.errorType.equals("BALANCE", true) -> AiAnalysisErrorType.BALANCE
+        result.statusCode == 429 || result.errorType.equals("RATE_LIMIT", true) -> AiAnalysisErrorType.RATE_LIMIT
+        result.statusCode in listOf(400, 422) || result.errorType.equals("INVALID_REQUEST", true) -> AiAnalysisErrorType.INVALID_REQUEST
+        result.statusCode in listOf(500, 503) || result.errorType.equals("SERVER", true) -> AiAnalysisErrorType.SERVER
+        result.errorType.equals("FORMAT", true) -> AiAnalysisErrorType.FORMAT
+        else -> AiAnalysisErrorType.NETWORK
+    }
+
+    private fun formatFailure(message: String) = AiAnalysisLoadResult.Failure(AiAnalysisErrorType.FORMAT, message)
+
+    private fun defaultErrorMessage(type: AiAnalysisErrorType): String = when (type) {
+        AiAnalysisErrorType.CONFIG -> "未配置 AI 服务，已展示演示分析"
+        AiAnalysisErrorType.AUTH -> "AI 服务鉴权失败，已展示演示分析"
+        AiAnalysisErrorType.BALANCE -> "AI 服务额度不足，已展示演示分析"
+        AiAnalysisErrorType.RATE_LIMIT -> "AI 请求过于频繁，请稍后重试"
+        AiAnalysisErrorType.INVALID_REQUEST -> "AI 请求参数无效，已展示演示分析"
+        AiAnalysisErrorType.SERVER -> "AI 服务暂时不可用，请稍后重试"
+        AiAnalysisErrorType.NETWORK -> "网络连接失败，请检查网络后重试"
+        AiAnalysisErrorType.FORMAT -> "AI 返回格式异常，已展示演示分析"
+    }
+
+    private sealed class Parsed<out T> {
+        data class Valid<T>(val value: T) : Parsed<T>()
+        data class Invalid(val message: String) : Parsed<Nothing>()
+    }
+
+    companion object {
+        const val DEFAULT_MODEL = "deepseek-flash"
+        const val SCHEMA_VERSION = "ai-analysis-v1"
+        const val PROMPT_VERSION = "stock-detail-v1"
+    }
+}
+
+internal object AiAnalysisMemoryCache {
+    private val values = mutableMapOf<String, AiAnalysis>()
+
+    fun get(key: String): AiAnalysis? = values[key]
+
+    fun put(key: String, analysis: AiAnalysis) {
+        values[key] = analysis
+    }
+
+    fun clearForTest() {
+        values.clear()
+    }
+}

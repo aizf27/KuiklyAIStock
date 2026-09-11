@@ -1,3 +1,13 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+val deepSeekApiKey = localProperties.getProperty("DEEPSEEK_API_KEY", "")
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 plugins {
     id("com.android.application")
     kotlin("android")
@@ -12,9 +22,13 @@ android {
         targetSdk = 30
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }
 
     buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepSeekApiKey\"")
+        }
         getByName("release") {
             isMinifyEnabled = false
         }

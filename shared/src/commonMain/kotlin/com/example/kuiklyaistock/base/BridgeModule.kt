@@ -305,6 +305,16 @@ internal class BridgeModule : Module() {
         return syncCallNativeMethod(URL_DECODE, params, null)
     }
 
+    fun supportsAiAnalysis(): Boolean =
+        syncCallNativeMethod(SUPPORTS_AI_ANALYSIS, null, null) == "1"
+
+    suspend fun requestAiAnalysis(request: JSONObject): JSONObject? =
+        suspendCoroutine { continuation ->
+            callNativeMethod(REQUEST_AI_ANALYSIS, request) { response ->
+                continuation.resume(response)
+            }
+        }
+
     private fun callNativeMethod(methodName: String, data: JSONObject?, callbackFn: CallbackFn?) {
         toNative(
             false,
@@ -352,6 +362,8 @@ internal class BridgeModule : Module() {
         const val URL_DECODE = "urlDecode"
         const val SHOW_PHOTO_BROWSER = "showPhotoBrowser"
         const val HUMAN_VERIFICATION = "humanVerification"
+        const val SUPPORTS_AI_ANALYSIS = "supportsAiAnalysis"
+        const val REQUEST_AI_ANALYSIS = "requestAiAnalysis"
     }
 
 }
