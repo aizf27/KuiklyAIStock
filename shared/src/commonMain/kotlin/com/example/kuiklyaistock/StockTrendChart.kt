@@ -8,7 +8,10 @@ import com.tencent.kuikly.core.views.View
 
 internal enum class StockChartPeriod(val title: String) {
     INTRADAY("分时"),
+    FIVE_DAY("5日"),
     DAILY("日K"),
+    WEEKLY("周K"),
+    MONTHLY("月K"),
 }
 
 internal fun ViewContainer<*, *>.StockTrendPeriodSelector(
