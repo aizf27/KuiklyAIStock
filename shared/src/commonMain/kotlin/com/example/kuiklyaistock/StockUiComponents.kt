@@ -47,9 +47,12 @@ internal fun formatStockTurnover(value: Double): String =
     if (value >= 100_000_000) "${formatStockUnitValue(value / 100_000_000.0)}亿"
     else "${formatStockUnitValue(value / 10_000.0)}万"
 
-// 格式化时间戳为 "MM-dd HH:mm" 格式
+// 格式化时间戳为 "MM-dd HH:mm" 格式（考虑中国时区 UTC+8）
 internal fun formatTimestamp(timestampMillis: Long): String {
-    val seconds = timestampMillis / 1000
+    // 加上8小时的偏移（中国时区 UTC+8）
+    val offsetMillis = timestampMillis + 8 * 60 * 60 * 1000L
+
+    val seconds = offsetMillis / 1000
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
