@@ -367,11 +367,14 @@ internal class StockHomePage : BasePager() {
             }
             "move" -> {
                 if (draggingFavoriteCode != code || dragCurrentIndex < 0 || favoriteCodes.size < 2) return
+                // 只有拖动距离超过半个卡片高度才触发交换，降低更新频率
                 val offsetRows = ((y - dragStartY) / StockDesignTokens.quoteRowHeight).toInt()
+                if (offsetRows == 0) return // 移动距离不够，不更新
+
                 val target = (dragCurrentIndex + offsetRows).coerceIn(0, favoriteCodes.lastIndex)
                 if (target != dragCurrentIndex && PortfolioStore.moveFavorite(dragCurrentIndex, target)) {
                     dragCurrentIndex = target
-                    dragStartY = y
+                    dragStartY = y // 更新基准位置
                 }
             }
             "end", "cancel" -> finishFavoriteDrag()
