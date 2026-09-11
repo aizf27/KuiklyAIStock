@@ -23,6 +23,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -47,6 +48,7 @@ dependencies {
 
     implementation("androidx.recyclerview:recyclerview:1.2.1")
     implementation("androidx.appcompat:appcompat:1.3.1")
+    implementation("androidx.multidex:multidex:2.0.1")
 
     implementation("com.squareup.picasso:picasso:2.71828")
 
