@@ -142,8 +142,8 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
             }
             StockDetailMetricItem("成交量", formatStockVolume(detail.volume))
             StockDetailMetricItem("成交额", formatStockTurnover(detail.turnover))
-            StockDetailMetricItem("换手率", "--")
-            StockDetailMetricItem("市盈率", "--")
+            StockDetailMetricItem("换手率", detail.turnoverRate?.let { "${formatStockPrice(it)}%" } ?: "--")
+            StockDetailMetricItem("市盈率", detail.peRatio?.let { formatStockPrice(it) } ?: "--")
         }
     }
 }

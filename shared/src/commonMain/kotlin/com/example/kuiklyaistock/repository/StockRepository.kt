@@ -73,8 +73,16 @@ class MockStockRepository(
     private val forcedFailures: Set<StockRequestType> = emptySet(),
     private val forcedEmptyResults: Set<StockRequestType> = emptySet(),
     private val analysisUnavailableCodes: Set<String> = emptySet(),
+    private val nowMillis: () -> Long = { 0L }, // 获取当前时间戳的回调
 ) : StockRepository {
-    private val details: List<StockDetail> = MOCK_STOCK_SEEDS.mapIndexed(::createStockDetail)
+    private fun getCurrentTimeString(): String {
+        val timestamp = nowMillis()
+        if (timestamp <= 0) return MOCK_UPDATED_AT
+        return com.example.kuiklyaistock.formatTimestamp(timestamp)
+    }
+
+    private val details: List<StockDetail>
+        get() = MOCK_STOCK_SEEDS.mapIndexed { index, seed -> createStockDetail(index, seed, getCurrentTimeString()) }
 
     override suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData> {
         scope.waitForMockResponse()
@@ -120,11 +128,11 @@ class MockStockRepository(
             sampleTurnoverAmount = details.sumOf { it.turnover },
             sampleNetInflowAmount = details.sumOf { it.turnover * it.quote.changePercent / 100.0 * 0.08 },
             indices = listOf(
-                MarketIndexQuote("上证指数", "000001", 3_951.51, 10.96, 0.28, MOCK_UPDATED_AT),
-                MarketIndexQuote("深证成指", "399001", 13_723.32, 20.11, 0.15, MOCK_UPDATED_AT),
-                MarketIndexQuote("创业板指", "399006", 3_354.97, -4.75, -0.14, MOCK_UPDATED_AT),
+                MarketIndexQuote("上证指数", "000001", 3_951.51, 10.96, 0.28, getCurrentTimeString()),
+                MarketIndexQuote("深证成指", "399001", 13_723.32, 20.11, 0.15, getCurrentTimeString()),
+                MarketIndexQuote("创业板指", "399006", 3_354.97, -4.75, -0.14, getCurrentTimeString()),
             ),
-            updatedAt = MOCK_UPDATED_AT,
+            updatedAt = getCurrentTimeString(),
         )
     }
 
@@ -133,7 +141,7 @@ class MockStockRepository(
         sentiment = "谨慎乐观",
         summary = "Mock 样本覆盖科技、消费、金融、新能源、医药和通信，板块表现分化。",
         riskTip = "关注高位波动、板块轮动加快和成交量回落风险。",
-        updatedAt = MOCK_UPDATED_AT,
+        updatedAt = getCurrentTimeString(),
     )
 
     private suspend fun CoroutineScope.waitForMockResponse() {
@@ -146,7 +154,7 @@ class MockStockRepository(
         else -> null
     }
 
-    private fun createStockDetail(index: Int, seed: MockStockSeed): StockDetail {
+    private fun createStockDetail(index: Int, seed: MockStockSeed, updatedAt: String): StockDetail {
         val previousClose = round2(seed.price / (1.0 + seed.changePercent / 100.0))
         val change = round2(seed.price - previousClose)
         val changePercent = round2(change / previousClose * 100.0)
@@ -157,13 +165,17 @@ class MockStockRepository(
         val low = round2(max(0.01, min(min(open, seed.price), previousClose) - amplitude * 0.82))
         val volume = 5_000_000L + (index * 3_760_000L) % 58_000_000L
         val turnover = round(volume * seed.price * 100.0) / 100.0
+        // 生成合理的换手率（0.5% - 8%）
+        val turnoverRate = round2(0.5 + (index * 13 % 75) / 10.0)
+        // 生成合理的市盈率（8 - 60）
+        val peRatio = round2(8.0 + (index * 17 % 520) / 10.0)
         val quote = StockQuote(
             name = seed.name,
             code = seed.code,
             price = seed.price,
             change = change,
             changePercent = changePercent,
-            updatedAt = MOCK_UPDATED_AT,
+            updatedAt = updatedAt,
         )
         return StockDetail(
             quote = quote,
@@ -173,6 +185,8 @@ class MockStockRepository(
             low = low,
             volume = volume,
             turnover = turnover,
+            turnoverRate = turnoverRate,
+            peRatio = peRatio,
             intradayTrend = createTrend(previousClose, seed.price, 13, amplitude * 0.42, index)
                 .mapIndexed { pointIndex, value -> TrendPoint(INTRADAY_LABELS[pointIndex], value) },
             dailyTrend = createTrend(previousClose * (1.0 - seed.changePercent / 180.0), seed.price, 20, amplitude, index + 11)

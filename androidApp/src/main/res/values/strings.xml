@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AIStock</string>
+    <color name="aistock_icon_background">#090909</color>
+</resources>

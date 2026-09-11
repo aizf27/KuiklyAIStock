@@ -47,6 +47,41 @@ internal fun formatStockTurnover(value: Double): String =
     if (value >= 100_000_000) "${formatStockUnitValue(value / 100_000_000.0)}亿"
     else "${formatStockUnitValue(value / 10_000.0)}万"
 
+// 格式化时间戳为 "MM-dd HH:mm" 格式
+internal fun formatTimestamp(timestampMillis: Long): String {
+    val seconds = timestampMillis / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    // 简化的日期计算（从1970-01-01开始）
+    val year = 1970 + (days / 365).toInt()
+    val daysInYear = days % 365
+
+    // 简化的月份计算（忽略闰年）
+    val monthDays = listOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    var month = 1
+    var remainingDays = daysInYear.toInt()
+    for (i in monthDays.indices) {
+        if (remainingDays > monthDays[i]) {
+            remainingDays -= monthDays[i]
+            month++
+        } else {
+            break
+        }
+    }
+    val day = remainingDays + 1
+    val hour = (hours % 24).toInt()
+    val minute = (minutes % 60).toInt()
+
+    return "${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
+}
+
+private fun Int.padStart(length: Int, padChar: Char): String {
+    val str = this.toString()
+    return if (str.length >= length) str else padChar.toString().repeat(length - str.length) + str
+}
+
 // 自选页使用的表头，显示三列数据：最新价、涨跌、涨跌幅
 internal fun ViewContainer<*, *>.StockWatchlistQuoteHeader(width: Float) {
     View {
