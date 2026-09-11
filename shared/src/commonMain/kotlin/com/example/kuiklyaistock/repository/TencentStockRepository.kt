@@ -28,35 +28,39 @@ class TencentStockRepository internal constructor(
     private var latestQuotes: List<StockQuote> = emptyList()
 
     override suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData> {
-        val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
-        val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
-        return when (val result = fetchAndDecode(stockSymbols + indexSymbols)) {
-            is DecodedQuotes.Remote -> buildRemoteHome(result, stockSymbols, indexSymbols)
-            is DecodedQuotes.Failed -> cachedHome(result.missingSymbols, result.completedAt, result.errorMessage)
+        // 1. 优先从数据库读取
+        val cachedQuotes = databaseRepo.getAllQuotes()
+        if (cachedQuotes.isNotEmpty()) {
+            logger("行情首页：从数据库读取 ${cachedQuotes.size} 只股票")
+            val homeData = buildHomeDataFromCache(cachedQuotes)
+            // 后台刷新网络数据
+            scope.launch { refreshHomeFromNetwork() }
+            return StockLoadResult.Success(homeData)
         }
+
+        // 2. 数据库为空，等待网络请求
+        logger("行情首页：数据库为空，等待网络请求")
+        return refreshHomeFromNetwork()
     }
 
     override suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData> {
         val normalized = code.trim()
         val symbol = TencentSymbolMapper.stockSymbol(normalized) ?: TencentSymbolMapper.indexSymbol(normalized)
             ?: return StockLoadResult.Empty
-        return when (val result = fetchAndDecode(listOf(symbol))) {
-            is DecodedQuotes.Remote -> {
-                val quote = result.quotes.firstOrNull { it.symbol == symbol }
-                    ?: return cachedDetail(symbol, result.completedAt, result.errorMessage)
-                StockLoadResult.Success(
-                    StockDetailData(
-                        detail = toStockDetail(quote),
-                        analysis = null,
-                        dataSource = StockDataSource.REMOTE,
-                        quoteTime = quote.updatedAt,
-                        requestCompletedAt = result.completedAt,
-                        missingCodes = result.missingSymbols.mapNotNull(TencentSymbolMapper::standardCode),
-                    )
-                )
-            }
-            is DecodedQuotes.Failed -> cachedDetail(symbol, result.completedAt, result.errorMessage)
+
+        // 1. 优先从数据库读取
+        val cachedQuote = databaseRepo.getQuote(normalized)
+        if (cachedQuote != null) {
+            logger("股票详情：从数据库读取 $code")
+            val detailData = buildDetailDataFromCache(cachedQuote, symbol)
+            // 后台刷新网络数据
+            scope.launch { refreshDetailFromNetwork(symbol, normalized) }
+            return StockLoadResult.Success(detailData)
         }
+
+        // 2. 数据库为空，等待网络请求
+        logger("股票详情：数据库为空，等待网络请求 $code")
+        return refreshDetailFromNetwork(symbol, normalized)
     }
 
     override suspend fun loadAi(scope: CoroutineScope): StockLoadResult<StockAiData> {
@@ -194,6 +198,59 @@ class TencentStockRepository internal constructor(
         )
     }
 
+    private suspend fun buildHomeDataFromCache(quotes: List<StockQuote>): StockHomeData {
+        val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
+        val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
+
+        val quoteMap = quotes.associateBy { it.code }
+        val stocks = STOCK_CODES.mapNotNull { quoteMap[it] }
+
+        val indices = indexSymbols.mapNotNull { symbol ->
+            TencentQuoteCache.get(symbol)?.quote
+        }
+
+        latestQuotes = stocks
+
+        return StockHomeData(
+            quotes = stocks,
+            marketSummary = createMarketSummary(stocks, indices, 0.0),
+            dataSource = StockDataSource.CACHE,
+            quoteTime = stocks.map { it.updatedAt }.maxOrNull().orEmpty(),
+            requestCompletedAt = nowMillis(),
+            isExpired = false,
+            missingCodes = emptyList(),
+        )
+    }
+
+    private suspend fun refreshHomeFromNetwork(): StockLoadResult<StockHomeData> {
+        val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
+        val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
+
+        return when (val result = fetchAndDecode(stockSymbols + indexSymbols)) {
+            is DecodedQuotes.Remote -> {
+                val stockQuotes = result.quotes
+                    .filter { it.symbol in stockSymbols }
+                    .map { toStockQuote(it) }
+
+                if (stockQuotes.isNotEmpty()) {
+                    databaseRepo.insertQuotes(stockQuotes)
+                    logger("行情首页：写入数据库 ${stockQuotes.size} 只股票")
+                }
+
+                buildRemoteHome(result, stockSymbols, indexSymbols)
+            }
+            is DecodedQuotes.Failed -> {
+                val fallback = databaseRepo.getAllQuotes()
+                if (fallback.isNotEmpty()) {
+                    logger("行情首页：网络失败，使用数据库缓存 ${fallback.size} 只")
+                    StockLoadResult.Success(buildHomeDataFromCache(fallback))
+                } else {
+                    StockLoadResult.Failure(result.errorMessage ?: "网络请求失败")
+                }
+            }
+        }
+    }
+
     private fun cachedDetail(
         symbol: String,
         completedAt: Long,
@@ -211,6 +268,92 @@ class TencentStockRepository internal constructor(
                 missingCodes = listOfNotNull(TencentSymbolMapper.standardCode(symbol)),
             )
         )
+    }
+
+    private suspend fun buildDetailDataFromCache(quote: StockQuote, symbol: String): StockDetailData {
+        val intradayTrend = databaseRepo.getIntradayTrend(quote.code)
+        val dailyKLine = databaseRepo.getKLines(quote.code, "daily")
+        val weeklyKLine = databaseRepo.getKLines(quote.code, "weekly")
+        val monthlyKLine = databaseRepo.getKLines(quote.code, "monthly")
+
+        val detail = StockDetail(
+            quote = quote,
+            open = 0.0,
+            previousClose = 0.0,
+            high = 0.0,
+            low = 0.0,
+            volume = 0,
+            turnover = 0.0,
+            turnoverRate = null,
+            peRatio = null,
+            intradayTrend = intradayTrend,
+            fiveDayTrend = emptyList(),
+            dailyKLine = dailyKLine,
+            weeklyKLine = weeklyKLine,
+            monthlyKLine = monthlyKLine,
+        )
+
+        return StockDetailData(
+            detail = detail,
+            analysis = null,
+            dataSource = StockDataSource.CACHE,
+            quoteTime = quote.updatedAt,
+            requestCompletedAt = nowMillis(),
+            missingCodes = emptyList(),
+        )
+    }
+
+    private suspend fun refreshDetailFromNetwork(symbol: String, code: String): StockLoadResult<StockDetailData> {
+        return when (val result = fetchAndDecode(listOf(symbol))) {
+            is DecodedQuotes.Remote -> {
+                val quote = result.quotes.firstOrNull { it.symbol == symbol }
+                    ?: return cachedDetail(symbol, result.completedAt, result.errorMessage)
+
+                val intradayTrend = MockDataGenerator.generateIntradayTrend(quote.price, quote.updatedAt)
+                val fiveDayTrend = MockDataGenerator.generateFiveDayTrend(quote.price)
+                val dailyKLine = MockDataGenerator.generateDailyKLines(quote.price)
+                val weeklyKLine = MockDataGenerator.generateWeeklyKLines(quote.price)
+                val monthlyKLine = MockDataGenerator.generateMonthlyKLines(quote.price)
+                val turnoverRate = MockDataGenerator.generateTurnoverRate()
+                val peRatio = MockDataGenerator.generatePeRatio()
+
+                val stockQuote = toStockQuote(quote)
+                databaseRepo.insertQuotes(listOf(stockQuote))
+                databaseRepo.insertIntradayTrend(code, intradayTrend)
+                databaseRepo.insertKLines(code, "daily", dailyKLine)
+                databaseRepo.insertKLines(code, "weekly", weeklyKLine)
+                databaseRepo.insertKLines(code, "monthly", monthlyKLine)
+
+                logger("股票详情：写入数据库 $code")
+
+                StockLoadResult.Success(
+                    StockDetailData(
+                        detail = StockDetail(
+                            quote = stockQuote,
+                            open = quote.open,
+                            previousClose = quote.previousClose,
+                            high = quote.high,
+                            low = quote.low,
+                            volume = quote.volume,
+                            turnover = quote.turnover,
+                            turnoverRate = turnoverRate,
+                            peRatio = peRatio,
+                            intradayTrend = intradayTrend,
+                            fiveDayTrend = fiveDayTrend,
+                            dailyKLine = dailyKLine,
+                            weeklyKLine = weeklyKLine,
+                            monthlyKLine = monthlyKLine,
+                        ),
+                        analysis = null,
+                        dataSource = StockDataSource.REMOTE,
+                        quoteTime = quote.updatedAt,
+                        requestCompletedAt = result.completedAt,
+                        missingCodes = result.missingSymbols.mapNotNull(TencentSymbolMapper::standardCode),
+                    )
+                )
+            }
+            is DecodedQuotes.Failed -> cachedDetail(symbol, result.completedAt, result.errorMessage)
+        }
     }
 
     private fun createMarketSummary(

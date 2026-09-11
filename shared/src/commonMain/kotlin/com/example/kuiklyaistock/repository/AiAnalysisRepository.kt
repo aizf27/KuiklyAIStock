@@ -96,26 +96,38 @@ internal class BridgeAiAnalysisTransport(
 
 internal class RemoteAiAnalysisRepository(
     private val transport: AiAnalysisTransport,
+    private val databaseRepo: StockDatabaseRepository,
     private val modelName: String = DEFAULT_MODEL,
     private val schemaVersion: String = SCHEMA_VERSION,
     private val promptVersion: String = PROMPT_VERSION,
 ) : AiAnalysisRepository {
     override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult {
         if (!transport.isSupported()) return AiAnalysisLoadResult.Unsupported
-        val cacheKey = listOf(detail.quote.code, detail.quote.updatedAt, modelName, promptVersion, schemaVersion).joinToString("|")
-        AiAnalysisMemoryCache.get(cacheKey)?.let {
-            return AiAnalysisLoadResult.Success(it.copy(source = AiAnalysisSource.CACHE))
+
+        // 1. 优先从数据库读取
+        val cached = databaseRepo.getAiAnalysis(detail.quote.code)
+        if (cached != null && cached.quoteTime == detail.quote.updatedAt) {
+            return AiAnalysisLoadResult.Success(cached.analysis.copy(source = AiAnalysisSource.CACHE))
         }
+
+        // 2. 发起网络请求
         val request = buildRequest(detail)
         return when (val result = transport.request(request)) {
-            is AiTransportResult.Success -> parseRemoteAnalysis(detail, result).also { parsed ->
+            is AiTransportResult.Success -> {
+                val parsed = parseRemoteAnalysis(detail, result)
                 if (parsed is AiAnalysisLoadResult.Success) {
-                    AiAnalysisMemoryCache.put(cacheKey, parsed.analysis)
+                    // 写入数据库
+                    databaseRepo.insertAiAnalysis(
+                        detail.quote.code,
+                        parsed.analysis,
+                        detail.quote.updatedAt
+                    )
                 }
+                parsed
             }
             is AiTransportResult.Failure -> AiAnalysisLoadResult.Failure(
                 type = mapFailure(result),
-                message = result.message.ifBlank { defaultErrorMessage(mapFailure(result)) },
+                message = result.message.ifBlank { defaultErrorMessage(mapFailure(result)) }
             )
         }
     }
