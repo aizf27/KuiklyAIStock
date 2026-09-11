@@ -6,8 +6,6 @@ import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
-import kotlin.math.abs
-import kotlin.math.roundToLong
 
 internal data class StockMarketSessionUi(
     val status: String,
@@ -56,21 +54,23 @@ internal fun stockMarketSession(minuteOfDay: Int): StockMarketSessionUi = when {
 }
 
 private fun stockMarketDataDescription(minuteOfDay: Int): String = when {
-    minuteOfDay < 9 * 60 + 30 -> "以下为上一个交易日数据"
-    minuteOfDay < 11 * 60 + 30 -> "以下为交易时段 Mock 数据"
-    minuteOfDay < 13 * 60 -> "以下为上午收盘 Mock 数据"
-    minuteOfDay < 15 * 60 -> "以下为当前交易时段 Mock 数据"
-    else -> "以下为上一个交易日数据"
+    minuteOfDay < 9 * 60 + 30 -> "当前展示最近一个交易时点快照"
+    minuteOfDay < 15 * 60 -> "当前展示腾讯行情快照"
+    else -> "当前展示最近一个交易时点快照"
 }
 
-private fun stockMarketDataTime(minuteOfDay: Int, clockText: String, sampleUpdatedAt: String): String {
-    val isTrading = minuteOfDay in (9 * 60 + 30) until (11 * 60 + 30) ||
-        minuteOfDay in (13 * 60) until (15 * 60)
-    return if (isTrading && clockText != "--:--") {
-        "数据时间 $clockText · Mock 数据"
-    } else {
-        "样本时间 $sampleUpdatedAt · Mock 数据"
-    }
+private fun stockMarketDataTime(
+    quoteTime: String,
+    sourceLabel: String,
+    expired: Boolean,
+    missingCount: Int,
+): String = buildString {
+    append("行情时间 ")
+    append(quoteTime.ifEmpty { "--" })
+    append(" · ")
+    append(sourceLabel)
+    if (expired) append("（已过期）")
+    if (missingCount > 0) append(" · ${missingCount}只未更新")
 }
 
 // 行情首页使用一个主卡片承载市场状态、指数和涨跌分布。
@@ -78,7 +78,10 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
     summary: MarketSummary?,
     width: Float,
     minuteOfDay: Int,
-    clockText: String,
+    sourceLabel: String,
+    quoteTime: String,
+    expired: Boolean,
+    missingCount: Int,
 ) {
     val session = stockMarketSession(minuteOfDay)
     val contentWidth = (width - StockDesignTokens.cardPadding * 2f).coerceAtLeast(0f)
@@ -115,10 +118,10 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
             if (summary != null) {
                 Text {
                     attr {
-                        text(formatStockFinancialAmount(summary.sampleNetInflowAmount))
-                        fontSize(21f)
+                        text("股票池 ${summary.totalCount}只")
+                        fontSize(13f)
                         fontWeightBold()
-                        color(stockChangeColor(summary.sampleNetInflowAmount))
+                        color(StockDesignTokens.primaryText)
                     }
                 }
             }
@@ -133,7 +136,7 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
                     flex(1f)
                 }
             }
-            Text { attr { text("样本资金净流入"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+            Text { attr { text(sourceLabel); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
         }
         if (summary == null) {
             Text { attr { text("正在同步市场数据..."); fontSize(13f); color(StockDesignTokens.secondaryText); marginTop(18f) } }
@@ -200,7 +203,7 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
             }
             Text {
                 attr {
-                    text(stockMarketDataTime(minuteOfDay, clockText, summary.updatedAt))
+                    text(stockMarketDataTime(quoteTime, sourceLabel, expired, missingCount))
                     fontSize(10f)
                     color(StockDesignTokens.tertiaryText)
                     marginTop(8f)
@@ -208,15 +211,6 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
             }
         }
     }
-}
-
-private fun formatStockFinancialAmount(value: Double): String {
-    val scaled = (abs(value) / 100_000_000.0 * 100.0).roundToLong()
-    val integerPart = scaled / 100
-    val decimalPart = scaled % 100
-    val decimalText = if (decimalPart < 10) "0$decimalPart" else decimalPart.toString()
-    val sign = if (value > 0) "+" else if (value < 0) "-" else ""
-    return "$sign$integerPart.${decimalText}亿"
 }
 
 private fun ViewContainer<*, *>.MarketDashboardIndexItem(index: MarketIndexQuote, width: Float) {
@@ -262,7 +256,7 @@ internal fun ViewContainer<*, *>.StockMarketSummary(summary: MarketSummary?, wid
             padding(StockDesignTokens.cardPadding)
             marginBottom(StockDesignTokens.sectionSpacing)
         }
-        Text { attr { text("市场概览 · 演示数据"); fontSize(16f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+        Text { attr { text("市场概览 · 行情快照"); fontSize(16f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
         if (summary == null) {
             Text { attr { text("正在同步市场数据..."); fontSize(13f); color(StockDesignTokens.secondaryText); marginTop(8f) } }
         } else {

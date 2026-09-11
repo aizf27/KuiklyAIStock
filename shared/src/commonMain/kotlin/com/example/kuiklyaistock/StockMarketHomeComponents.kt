@@ -1,6 +1,7 @@
 package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.model.StockQuote
+import com.example.kuiklyaistock.model.displayName
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.directives.velse
 import com.tencent.kuikly.core.directives.vif
@@ -46,7 +47,7 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
             vif({ page.selectedMarketCategory != StockMarketCategories.MARKET }) {
                 StockMarketEmptyState(
                     page.stockContentWidth(),
-                    "${page.selectedMarketCategory}暂无演示数据",
+                    "${page.selectedMarketCategory}暂未接入真实数据",
                     "当前版本先提供大盘行情",
                 )
             }
@@ -55,7 +56,10 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
                     summary = page.marketSummary,
                     width = page.stockContentWidth(),
                     minuteOfDay = page.currentMinuteOfDay,
-                    clockText = page.currentClockText,
+                    sourceLabel = page.dataSource.displayName(),
+                    quoteTime = page.quoteTime,
+                    expired = page.quoteExpired,
+                    missingCount = page.missingQuoteCodes.size,
                 )
                 StockTimelyInformationCard(
                     width = page.stockContentWidth(),
