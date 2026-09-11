@@ -23,7 +23,7 @@ internal fun ViewContainer<*, *>.StockAiContent(
                 padding(top = 12f, bottom = StockDesignTokens.pageBottomSpacing)
             }
             Text { attr { text("市场观点"); fontSize(20f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
-            Text { attr { text("观点参考 · 演示数据，不构成投资建议"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
+            Text { attr { text("观点参考 · 规则解读，不构成投资建议"); fontSize(12f); color(StockDesignTokens.secondaryText); marginTop(4f); marginBottom(12f) } }
             overview?.let { AiMarketOverviewCard(it) }
             Text { attr { text("重点股票"); fontSize(17f); fontWeightBold(); color(StockDesignTokens.primaryText); marginTop(StockDesignTokens.pageSectionSpacing); marginBottom(8f) } }
             if (insights.isEmpty()) {
@@ -47,7 +47,7 @@ private fun ViewContainer<*, *>.AiMarketOverviewCard(overview: AiMarketOverview)
         Text { attr { text("观点判断：${overview.sentiment}"); fontSize(13f); color(StockDesignTokens.secondaryText); marginTop(10f) } }
         Text { attr { text("事实摘要：${overview.summary}"); fontSize(14f); color(StockDesignTokens.primaryText); marginTop(6f) } }
         Text { attr { text("风险提示：${overview.riskTip}"); fontSize(13f); color(StockDesignTokens.risk); marginTop(10f) } }
-        Text { attr { text("数据截至 ${overview.updatedAt} · 演示数据"); fontSize(11f); color(StockDesignTokens.tertiaryText); marginTop(10f) } }
+        Text { attr { text("数据截至 ${overview.updatedAt} · 行情快照"); fontSize(11f); color(StockDesignTokens.tertiaryText); marginTop(10f) } }
     }
 }
 

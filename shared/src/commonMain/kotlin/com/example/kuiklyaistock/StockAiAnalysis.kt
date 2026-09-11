@@ -592,7 +592,7 @@ private fun ViewContainer<*, *>.AiAnalysisFooter(analysis: AiAnalysis, width: Fl
         }
         Text {
             attr {
-                text("行情为演示数据；分析范围为价格、当日高低点、分时与日 K 样本")
+                text(if (analysis.isDemo) "分析使用 Mock 行情与走势样本" else "分析仅使用真实行情快照，未包含分时与日 K 数据")
                 fontSize(11f)
                 color(StockDesignTokens.tertiaryText)
             }

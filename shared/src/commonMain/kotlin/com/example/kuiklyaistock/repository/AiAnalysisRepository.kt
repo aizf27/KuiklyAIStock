@@ -122,8 +122,8 @@ internal class RemoteAiAnalysisRepository(
 
     private fun buildRequest(detail: StockDetail): AiAnalysisRequest {
         val systemPrompt = """
-            你是股票行情演示产品的结构化分析助手。必须只输出合法 JSON 对象，不要 Markdown、代码块或额外说明。
-            行情可能是演示数据，不得宣称实时，不得给出买卖指令、收益承诺或确定性预测。
+            你是股票行情产品的结构化分析助手。必须只输出合法 JSON 对象，不要 Markdown、代码块或额外说明。
+            只能依据输入的行情快照，不得补写不存在的时序走势，不得给出买卖指令、收益承诺或确定性预测。
             schema=$schemaVersion。枚举：trendType=STRONG|SIDEWAYS|WEAK，riskLevel=LOW|MEDIUM|HIGH。
             signals 最多 3 条，primaryRisks 最多 2 条。observationPlan 无合理计划时返回 null。
             JSON 结构必须为：
@@ -133,17 +133,25 @@ internal class RemoteAiAnalysisRepository(
             "signals":[{"title":"文本","status":"文本","explanation":"文本","evidence":"文本"}],
             "riskLevel":"LOW|MEDIUM|HIGH","primaryRisks":["文本"],"invalidationCondition":"文本"}。
         """.trimIndent()
-        val intraday = detail.intradayTrend.joinToString("；") { "${it.label}:${it.price}" }
-        val daily = detail.dailyTrend.joinToString("；") { "${it.label}:${it.price}" }
-        val userPrompt = """
-            请基于以下演示行情生成 JSON 分析：
-            名称=${detail.quote.name}，代码=${detail.quote.code}，行情时间=${detail.quote.updatedAt}
-            当前价=${detail.quote.price}，涨跌=${detail.quote.change}，涨跌幅=${detail.quote.changePercent}%
-            今开=${detail.open}，昨收=${detail.previousClose}，最高=${detail.high}，最低=${detail.low}
-            成交量=${detail.volume}，成交额=${detail.turnover}
-            分时样本=$intraday
-            日K样本=$daily
-        """.trimIndent()
+        val userPrompt = buildString {
+            appendLine("请基于以下行情快照生成 JSON 分析：")
+            appendLine("名称=${detail.quote.name}，代码=${detail.quote.code}，行情时间=${detail.quote.updatedAt}")
+            appendLine("当前价=${detail.quote.price}，涨跌=${detail.quote.change}，涨跌幅=${detail.quote.changePercent}%")
+            appendLine("今开=${detail.open}，昨收=${detail.previousClose}，最高=${detail.high}，最低=${detail.low}")
+            append("成交量=${detail.volume}，成交额=${detail.turnover}")
+            if (detail.intradayTrend.isNotEmpty()) {
+                appendLine()
+                append("分时样本=${detail.intradayTrend.joinToString("；") { "${it.label}:${it.price}" }}")
+            }
+            if (detail.dailyTrend.isNotEmpty()) {
+                appendLine()
+                append("日K样本=${detail.dailyTrend.joinToString("；") { "${it.label}:${it.price}" }}")
+            }
+            if (detail.intradayTrend.isEmpty() && detail.dailyTrend.isEmpty()) {
+                appendLine()
+                append("本次未提供真实分时或日 K 数据，不得推断时序走势。")
+            }
+        }
         return AiAnalysisRequest(detail.quote.code, modelName, systemPrompt, userPrompt)
     }
 

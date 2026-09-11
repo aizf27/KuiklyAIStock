@@ -117,6 +117,21 @@ class AiAnalysisRepositoryTest {
         }
     }
 
+
+    @Test
+    fun omitsEmptyTrendSamplesFromRealSnapshotPrompt() {
+        val transport = FakeTransport(success(validJson()))
+        val realSnapshot = detail.copy(intradayTrend = emptyList(), dailyTrend = emptyList())
+
+        runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(realSnapshot) }
+
+        val prompt = transport.lastRequest?.userPrompt.orEmpty()
+        assertTrue(prompt.contains("行情快照"))
+        assertTrue(prompt.contains("未提供真实分时或日 K 数据"))
+        assertTrue(!prompt.contains("分时样本="))
+        assertTrue(!prompt.contains("日K样本="))
+    }
+
     @Test
     fun returnsUnsupportedWithoutStartingRequest() {
         val transport = FakeTransport(success(validJson()), supported = false)
@@ -188,11 +203,13 @@ class AiAnalysisRepositoryTest {
         private val supported: Boolean = true,
     ) : AiAnalysisTransport {
         var callCount = 0
+        var lastRequest: AiAnalysisRequest? = null
 
         override fun isSupported(): Boolean = supported
 
         override suspend fun request(request: AiAnalysisRequest): AiTransportResult {
             callCount++
+            lastRequest = request
             return result
         }
     }
