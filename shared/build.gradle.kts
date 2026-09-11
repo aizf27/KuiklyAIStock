@@ -7,6 +7,7 @@ plugins {
     id("com.google.devtools.ksp")
     id("maven-publish")
     id("com.tencent.kuikly-open.kuikly")
+    id("app.cash.sqldelight") version "2.0.1"
 
 }
 
@@ -61,6 +62,7 @@ kotlin {
                 implementation("com.tencent.kuikly-open:core:${Version.getKuiklyVersion()}")
                 implementation("com.tencent.kuikly-open:core-annotations:${Version.getKuiklyVersion()}")
                 implementation(project(":KuiklyChart"))
+                implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
 
             }
         }
@@ -72,6 +74,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api("com.tencent.kuikly-open:core-render-android:${Version.getKuiklyVersion()}")
+                implementation("app.cash.sqldelight:android-driver:2.0.1")
             }
         }
 
@@ -161,5 +164,14 @@ configure<KuiklyConfig> {
         outputName("nativevue2")
         // 可选：分包构建时的页面列表，如果为空则构建全部页面
         // addSplitPage("route","home")
+    }
+}
+
+// SQLDelight 配置
+sqldelight {
+    databases {
+        create("StockDatabase") {
+            packageName.set("com.example.kuiklyaistock.db")
+        }
     }
 }
