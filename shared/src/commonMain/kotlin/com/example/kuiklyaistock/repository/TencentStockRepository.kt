@@ -227,27 +227,59 @@ class TencentStockRepository internal constructor(
         val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
         val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
 
-        return when (val result = fetchAndDecode(stockSymbols + indexSymbols)) {
-            is DecodedQuotes.Remote -> {
-                val stockQuotes = result.quotes
-                    .filter { it.symbol in stockSymbols }
-                    .map { toStockQuote(it) }
+        // 先请求三个指数
+        logger("行情首页：先请求三个指数")
+        val indexResult = fetchAndDecode(indexSymbols)
 
-                if (stockQuotes.isNotEmpty()) {
-                    databaseRepo.insertQuotes(stockQuotes)
-                    logger("行情首页：写入数据库 ${stockQuotes.size} 只股票")
-                }
+        // 再请求个股
+        logger("行情首页：再请求个股数据")
+        val stockResult = fetchAndDecode(stockSymbols)
 
-                buildRemoteHome(result, stockSymbols, indexSymbols)
+        // 合并结果
+        val allQuotes = mutableListOf<TencentParsedQuote>()
+        val allMissing = mutableListOf<String>()
+        var completedAt = nowMillis()
+        var errorMessage: String? = null
+
+        if (indexResult is DecodedQuotes.Remote) {
+            allQuotes.addAll(indexResult.quotes)
+            allMissing.addAll(indexResult.missingSymbols)
+            completedAt = indexResult.completedAt
+            errorMessage = indexResult.errorMessage
+        } else if (indexResult is DecodedQuotes.Failed) {
+            allMissing.addAll(indexResult.missingSymbols)
+            errorMessage = indexResult.errorMessage
+        }
+
+        if (stockResult is DecodedQuotes.Remote) {
+            allQuotes.addAll(stockResult.quotes)
+            allMissing.addAll(stockResult.missingSymbols)
+            completedAt = stockResult.completedAt
+            if (errorMessage == null) errorMessage = stockResult.errorMessage
+        } else if (stockResult is DecodedQuotes.Failed) {
+            allMissing.addAll(stockResult.missingSymbols)
+            if (errorMessage == null) errorMessage = stockResult.errorMessage
+        }
+
+        return if (allQuotes.isNotEmpty()) {
+            val stockQuotes = allQuotes
+                .filter { it.symbol in stockSymbols }
+                .map { toStockQuote(it) }
+
+            if (stockQuotes.isNotEmpty()) {
+                databaseRepo.insertQuotes(stockQuotes)
+                logger("行情首页：写入数据库 ${stockQuotes.size} 只股票")
             }
-            is DecodedQuotes.Failed -> {
-                val fallback = databaseRepo.getAllQuotes()
-                if (fallback.isNotEmpty()) {
-                    logger("行情首页：网络失败，使用数据库缓存 ${fallback.size} 只")
-                    StockLoadResult.Success(buildHomeDataFromCache(fallback))
-                } else {
-                    StockLoadResult.Failure(result.errorMessage ?: "网络请求失败")
-                }
+
+            val result = DecodedQuotes.Remote(allQuotes, allMissing.distinct(), completedAt, errorMessage)
+            buildRemoteHome(result, stockSymbols, indexSymbols)
+        } else {
+            val fallback = databaseRepo.getAllQuotes()
+            if (fallback.isNotEmpty()) {
+                logger("行情首页：网络失败，使用数据库缓存 ${fallback.size} 只")
+                StockLoadResult.Success(buildHomeDataFromCache(fallback))
+            } else {
+                StockLoadResult.Failure(errorMessage ?: "网络请求失败")
             }
         }
     }

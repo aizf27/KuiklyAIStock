@@ -29,7 +29,18 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
             padding(StockDesignTokens.pageHorizontalPadding)
             flexDirectionColumn()
         }
-        // 标题行：股票名称 + 代码 + 关注按钮
+        // 第一行：真实行情·日期
+        if (sourceLabel.isNotEmpty()) {
+            Text {
+                attr {
+                    text(sourceLabel)
+                    fontSize(11f)
+                    color(StockDesignTokens.secondaryText)
+                    marginBottom(6f)
+                }
+            }
+        }
+        // 第二行：股票名称 + 代码 + 关注按钮
         View {
             attr {
                 width(width - StockDesignTokens.pageHorizontalPadding * 2)
@@ -54,16 +65,6 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
                         text(detail.quote.code)
                         fontSize(14f)
                         color(StockDesignTokens.tertiaryText)
-                    }
-                }
-                if (sourceLabel.isNotEmpty()) {
-                    Text {
-                        attr {
-                            text(sourceLabel)
-                            fontSize(11f)
-                            color(StockDesignTokens.secondaryText)
-                            marginLeft(8f)
-                        }
                     }
                 }
             }

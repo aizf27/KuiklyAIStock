@@ -38,7 +38,8 @@ internal class StockHomePage : BasePager() {
     private val repository: StockRepository by lazy {
         val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
         val databaseRepo = SqlDelightStockDatabaseRepository(
-            DatabaseFactory.getDatabaseFromPager(this)
+            DatabaseFactory.getDatabaseFromPager(this),
+            nowMillis = { bridge.currentTimeStamp() }
         )
         TencentStockRepository(
             pager = this,

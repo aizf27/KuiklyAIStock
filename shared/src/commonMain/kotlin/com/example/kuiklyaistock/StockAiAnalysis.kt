@@ -39,6 +39,7 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(
     onQuickQuestion: (String) -> Unit = {},
     onDetailToggle: () -> Unit = {},
     onRetry: () -> Unit = {},
+    onRefresh: () -> Unit = {}, // 新增刷新回调
 ) {
     val contentWidth = width - StockDesignTokens.pageHorizontalPadding * 2
     View {
@@ -67,6 +68,24 @@ internal fun ViewContainer<*, *>.AiAnalysisSection(
                         text("正在重新分析…")
                         fontSize(11f)
                         color(StockDesignTokens.brand)
+                    }
+                }
+            }
+            // 刷新按钮
+            vif({ analysis() != null }) {
+                View {
+                    attr {
+                        width(44f)
+                        height(44f)
+                        allCenter()
+                    }
+                    event { click { onRefresh() } }
+                    Text {
+                        attr {
+                            text("↻")
+                            fontSize(20f)
+                            color(if (loadState() == AiLoadState.LOADING) StockDesignTokens.tertiaryText else StockDesignTokens.brand)
+                        }
                     }
                 }
             }

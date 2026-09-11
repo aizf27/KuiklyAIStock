@@ -15,6 +15,7 @@ import kotlinx.serialization.decodeFromString
 // SQLDelight 实现的数据库仓储
 internal class SqlDelightStockDatabaseRepository(
     private val database: StockDatabase,
+    private val nowMillis: () -> Long = { 0L },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : StockDatabaseRepository {
 
@@ -49,7 +50,7 @@ internal class SqlDelightStockDatabaseRepository(
                     turnoverRate = null,
                     peRatio = null,
                     updatedAt = quote.updatedAt,
-                    cachedAt = System.currentTimeMillis()
+                    cachedAt = nowMillis()
                 )
             }
         }
@@ -132,7 +133,7 @@ internal class SqlDelightStockDatabaseRepository(
             code = code,
             content = content,
             quoteTime = quoteTime,
-            analyzedAt = System.currentTimeMillis()
+            analyzedAt = nowMillis()
         )
     }
 

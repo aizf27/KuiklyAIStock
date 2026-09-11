@@ -473,6 +473,7 @@ internal fun ViewContainer<*, *>.StockWatchlistTabs(
             height(48f)
             backgroundColor(StockDesignTokens.surface)
             flexDirectionRow()
+            justifyContentSpaceAround() // 改为均匀分布，消除右边空格
         }
         tabs.forEach { (tab, label) ->
             View {

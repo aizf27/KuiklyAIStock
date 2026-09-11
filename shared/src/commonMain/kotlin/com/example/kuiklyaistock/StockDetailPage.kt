@@ -40,7 +40,8 @@ internal class StockDetailPage : BasePager() {
     private val repository: StockRepository by lazy {
         val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
         val databaseRepo = SqlDelightStockDatabaseRepository(
-            DatabaseFactory.getDatabaseFromPager(this)
+            DatabaseFactory.getDatabaseFromPager(this),
+            nowMillis = { bridge.currentTimeStamp() }
         )
         TencentStockRepository(
             pager = this,
@@ -82,7 +83,8 @@ internal class StockDetailPage : BasePager() {
         PortfolioPersistence.ensureLoaded(bridge)
         quoteRefreshActive = true
         val databaseRepo = SqlDelightStockDatabaseRepository(
-            DatabaseFactory.getDatabaseFromPager(this)
+            DatabaseFactory.getDatabaseFromPager(this),
+            nowMillis = { bridge.currentTimeStamp() }
         )
         aiRepository = RemoteAiAnalysisRepository(
             BridgeAiAnalysisTransport(bridge),
@@ -167,6 +169,7 @@ internal class StockDetailPage : BasePager() {
                                 onQuickQuestion = { ctx.selectAiQuickQuestion(it) },
                                 onDetailToggle = { ctx.toggleAiDetail() },
                                 onRetry = { ctx.retryAiAnalysis() },
+                                onRefresh = { ctx.refreshAiAnalysis() }, // 新增刷新回调
                             )
                         }
                     }
@@ -226,21 +229,15 @@ internal class StockDetailPage : BasePager() {
                         detailLoading = false
                         return@launch
                     }
-                    result.data.analysis?.let { displayedAnalysis = it }
                     detail = result.data.detail
                     dataSource = result.data.dataSource
                     quoteTime = result.data.quoteTime
                     quoteExpired = result.data.isExpired
                     refreshChartData(result.data.detail)
-                    if (
-                        result.data.dataSource != StockDataSource.MOCK &&
-                        !result.data.isExpired &&
-                        displayedAnalysis == null &&
-                        analyzedQuoteTime != result.data.quoteTime
-                    ) {
-                        analyzedQuoteTime = result.data.quoteTime
-                        loadRemoteAnalysis(result.data.detail)
-                    }
+
+                    // 从数据库加载AI分析
+                    loadAiAnalysisFromDatabase(code)
+
                     errorMessage = ""
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载成功: $code")
                 }
@@ -292,26 +289,8 @@ internal class StockDetailPage : BasePager() {
 
     private fun refreshChartData(stock: StockDetail) {
         chartCandles.clear()
-
-        // 根据选择的周期从数据库加载对应的K线数据
-        val data = when (selectedChartPeriod) {
-            StockChartPeriod.INTRADAY -> stock.intradayTrend.map {
-                OhlcPoint(it.label, it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.volume.toFloat())
-            }
-            StockChartPeriod.FIVE_DAY -> stock.fiveDayTrend.map {
-                OhlcPoint(it.label, it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.volume.toFloat())
-            }
-            StockChartPeriod.DAILY -> stock.dailyKLine
-            StockChartPeriod.WEEKLY -> stock.weeklyKLine
-            StockChartPeriod.MONTHLY -> stock.monthlyKLine
-        }
-
-        if (data.isNotEmpty()) {
-            chartCandles.addAll(data)
-        } else if (dataSource == StockDataSource.MOCK) {
-            // 仅当数据库无数据且是MOCK源时才使用模拟数据
-            chartCandles.addAll(mockStockCandles(stock, selectedChartPeriod))
-        }
+        // 全部使用mock数据
+        chartCandles.addAll(mockStockCandles(stock, selectedChartPeriod))
     }
 
     private fun resetAiInteractionState() {
@@ -367,6 +346,33 @@ internal class StockDetailPage : BasePager() {
             resetAiInteractionState()
             analyzedQuoteTime = quoteTime
             loadRemoteAnalysis(it)
+        }
+    }
+
+    private fun refreshAiAnalysis() {
+        detail?.let { stock ->
+            resetAiInteractionState()
+            acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 手动刷新AI分析: ${stock.quote.code}")
+            loadRemoteAnalysis(stock)
+        }
+    }
+
+    private fun loadAiAnalysisFromDatabase(code: String) {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val databaseRepo = SqlDelightStockDatabaseRepository(
+            DatabaseFactory.getDatabaseFromPager(this),
+            nowMillis = { bridge.currentTimeStamp() }
+        )
+        lifecycleScope.launch {
+            val cached = databaseRepo.getAiAnalysis(code)
+            if (cached != null) {
+                displayedAnalysis = cached.analysis
+                aiLoadState = AiLoadState.SUCCESS
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 从数据库加载AI分析: $code")
+            } else {
+                // 数据库没有，自动请求一次
+                detail?.let { loadRemoteAnalysis(it) }
+            }
         }
     }
 
