@@ -6,12 +6,15 @@ import com.example.kuiklyaistock.base.setTimeout
 import com.example.kuiklyaistock.model.AiMarketOverview
 import com.example.kuiklyaistock.model.AiStockInsight
 import com.example.kuiklyaistock.model.MarketSummary
+import com.example.kuiklyaistock.model.StockPosition
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.MockStockRepository
+import com.example.kuiklyaistock.repository.PortfolioPersistence
+import com.example.kuiklyaistock.repository.PortfolioStore
 import com.example.kuiklyaistock.repository.StockLoadResult
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockRequestTracker
-import com.example.kuiklyaistock.repository.WatchlistStore
+import com.example.kuiklyaistock.repository.searchStockQuotes
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -35,7 +38,9 @@ internal class StockHomePage : BasePager() {
     private var overview by observable<AiMarketOverview?>(null)
     private var insights by observable(emptyList<AiStockInsight>())
     private var errorMessage by observable("")
-    internal var favoriteCodes by observable(emptySet<String>())
+    internal var favoriteCodes by observable(emptyList<String>())
+    internal var positions by observable(emptyList<StockPosition>())
+    internal var watchlistEditing by observable(false)
     internal var selectedTab by observable(StockTabs.MARKET)
     internal var selectedMarketCategory by observable(StockMarketCategories.MARKET)
     internal var selectedWatchlistTab by observable(WatchlistTabs.WATCHLIST)
@@ -43,14 +48,22 @@ internal class StockHomePage : BasePager() {
     internal var currentMinuteOfDay by observable(15 * 60)
     internal var currentClockText by observable("--:--")
     internal var currentDateText by observable("")
-    private var removeWatchlistObserver: (() -> Unit)? = null
+    private var removePortfolioObserver: (() -> Unit)? = null
+    private var draggingFavoriteCode = ""
+    private var dragStartY = 0f
+    private var dragCurrentIndex = -1
     private val contentRequests = StockRequestTracker()
     private var marketClockActive = false
 
     override fun created() {
         super.created()
         marketClockActive = true
-        removeWatchlistObserver = WatchlistStore.subscribe { favoriteCodes = it }
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        PortfolioPersistence.ensureLoaded(bridge)
+        removePortfolioObserver = PortfolioStore.subscribe { state ->
+            favoriteCodes = state.favoriteCodes
+            positions = state.positions
+        }
         refreshMarketClock()
         scheduleMarketClockRefresh()
         loadContent()
@@ -59,8 +72,8 @@ internal class StockHomePage : BasePager() {
     override fun onDestroyPager() {
         marketClockActive = false
         contentRequests.invalidate()
-        removeWatchlistObserver?.invoke()
-        removeWatchlistObserver = null
+        removePortfolioObserver?.invoke()
+        removePortfolioObserver = null
         super.onDestroyPager()
     }
 
@@ -104,6 +117,7 @@ internal class StockHomePage : BasePager() {
             }
             StockBottomBar(ctx, { ctx.selectedTab }) { tab ->
                 if (ctx.selectedTab != tab) {
+                    if (ctx.selectedTab == StockTabs.WATCHLIST) ctx.updateWatchlistEditing(false)
                     ctx.selectedTab = tab
                     ctx.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 切换根Tab: $tab")
                 }
@@ -183,12 +197,7 @@ internal class StockHomePage : BasePager() {
         else -> marketSummary != null && quotes.isNotEmpty()
     }
 
-    internal fun filteredMarketQuotes(): List<StockQuote> {
-        val query = searchText.trim().lowercase()
-        return quotes
-            .filter { it.code.length == 6 }
-            .filter { query.isEmpty() || it.name.lowercase().contains(query) || it.code.lowercase().contains(query) }
-    }
+    internal fun filteredMarketQuotes(): List<StockQuote> = searchStockQuotes(quotes, searchText)
 
     internal fun updateSearchText(text: String) {
         searchText = text
@@ -213,22 +222,80 @@ internal class StockHomePage : BasePager() {
     }
 
     internal fun toggleFavorite(code: String) {
-        val favorite = WatchlistStore.toggle(code)
-        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 自选${if (favorite) "添加" else "移除"}: $code")
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val favorite = PortfolioStore.toggleFavorite(code)
+        PortfolioPersistence.save(bridge)
+        bridge.log("stock_home 自选${if (favorite) "添加" else "移除"}: $code")
+    }
+
+    internal fun favoriteQuotes(): List<StockQuote> {
+        val quotesByCode = quotes.associateBy { it.code }
+        return favoriteCodes.mapNotNull(quotesByCode::get)
+    }
+
+    internal fun searchResults(): List<StockQuote> = filteredMarketQuotes()
+
+    internal fun holdingRows(): List<Pair<StockPosition, StockQuote>> {
+        val quotesByCode = quotes.associateBy { it.code }
+        return positions.mapNotNull { position -> quotesByCode[position.code]?.let { position to it } }
+    }
+
+    internal fun updateWatchlistEditing(editing: Boolean) {
+        watchlistEditing = editing
+        if (!editing) finishFavoriteDrag()
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page ${if (editing) "进入" else "退出"}编辑模式")
+    }
+
+    internal fun removeFavorite(code: String) {
+        if (PortfolioStore.removeFavorite(code)) {
+            if (draggingFavoriteCode == code) finishFavoriteDrag()
+            PortfolioPersistence.save(acquireModule(BridgeModule.MODULE_NAME))
+        }
+    }
+
+    internal fun dragFavorite(code: String, state: String, y: Float) {
+        when (state) {
+            "start" -> {
+                if (!watchlistEditing || favoriteCodes.size < 2) return
+                draggingFavoriteCode = code
+                dragStartY = y
+                dragCurrentIndex = favoriteCodes.indexOf(code)
+            }
+            "move" -> {
+                if (draggingFavoriteCode != code || dragCurrentIndex < 0 || favoriteCodes.size < 2) return
+                val offsetRows = ((y - dragStartY) / StockDesignTokens.quoteRowHeight).toInt()
+                val target = (dragCurrentIndex + offsetRows).coerceIn(0, favoriteCodes.lastIndex)
+                if (target != dragCurrentIndex && PortfolioStore.moveFavorite(dragCurrentIndex, target)) {
+                    dragCurrentIndex = target
+                    dragStartY = y
+                }
+            }
+            "end", "cancel" -> finishFavoriteDrag()
+        }
+    }
+
+    private fun finishFavoriteDrag() {
+        if (draggingFavoriteCode.isNotEmpty()) {
+            PortfolioPersistence.save(acquireModule(BridgeModule.MODULE_NAME))
+            acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 排序已保存")
+        }
+        draggingFavoriteCode = ""
+        dragCurrentIndex = -1
+        dragStartY = 0f
     }
 }
 
 private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
     View {
         attr { flex(1f) }
-        // 顶部搜索区域（包含页面标题和搜索框）
         StockWatchlistTopArea(page)
-        // 自选股 / 持仓股 Tab 切换
         StockWatchlistTabs(page.stockContentWidth(), { page.selectedWatchlistTab }) { tab ->
-            page.selectedWatchlistTab = tab
-            page.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 切换Tab: $tab")
+            if (page.selectedWatchlistTab != tab) {
+                page.updateWatchlistEditing(false)
+                page.selectedWatchlistTab = tab
+                page.acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("watchlist_page 切换Tab: $tab")
+            }
         }
-        // 滚动内容区域
         Scroller {
             attr { flex(1f) }
             View {
@@ -237,49 +304,43 @@ private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
                     alignSelfCenter()
                     paddingBottom(StockDesignTokens.pageBottomSpacing)
                 }
-                // 自选股 Tab 内容
-                vif({ page.selectedWatchlistTab == WatchlistTabs.WATCHLIST }) {
-                    // 自选股列表
-                    vif({ page.quotes.any { it.code in page.favoriteCodes } }) {
-                        // 列表工具栏：显示数量、排序、编辑
-                        StockWatchlistToolbar(page)
-                        // 股票列表
-                        StockWatchlistQuoteList(page)
-                        // 底部更新时间
-                        StockWatchlistFooter(page)
-                    }
-                    // 空状态
-                    vif({ page.quotes.none { it.code in page.favoriteCodes } }) {
-                        StockWatchlistEmptyState(page)
-                    }
+                vif({ page.searchText.trim().isNotEmpty() }) {
+                    StockSearchResults(page)
                 }
-                // 持仓股 Tab 内容（暂无演示数据）
-                vif({ page.selectedWatchlistTab == WatchlistTabs.HOLDINGS }) {
-                    StockHoldingsEmptyState(page)
+                velse {
+                    vif({ page.selectedWatchlistTab == WatchlistTabs.WATCHLIST }) {
+                        vif({ page.favoriteQuotes().isNotEmpty() }) {
+                            StockWatchlistToolbar(page)
+                            StockWatchlistQuoteList(page)
+                            StockWatchlistFooter()
+                        }
+                        velse { StockWatchlistEmptyState(page) }
+                    }
+                    velse {
+                        vif({ page.holdingRows().isNotEmpty() }) { StockHoldingsList(page) }
+                        velse { StockHoldingsEmptyState() }
+                    }
                 }
             }
         }
     }
 }
 
-// 自选页顶部区域：搜索框
 private fun ViewContainer<*, *>.StockWatchlistTopArea(page: StockHomePage) {
     View {
         attr {
             backgroundColor(StockDesignTokens.surface)
             padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f, bottom = 12f)
         }
-        // 搜索框
         StockSearchInput(
             page.searchText,
-            "搜索股票名称或代码",
+            "搜索股票名称或六位代码",
             { page.updateSearchText(it) },
-            { page.submitSearch(it) }
+            { page.submitSearch(it) },
         )
     }
 }
 
-// 列表工具栏：自选数量、排序、编辑
 private fun ViewContainer<*, *>.StockWatchlistToolbar(page: StockHomePage) {
     View {
         attr {
@@ -288,13 +349,12 @@ private fun ViewContainer<*, *>.StockWatchlistToolbar(page: StockHomePage) {
             height(52f)
             flexDirectionRow()
             alignItemsCenter()
-            padding(left = 16f, right = 16f)
+            padding(left = 16f, right = 8f)
             marginTop(12f)
         }
-        val count = page.quotes.count { it.code in page.favoriteCodes }
         Text {
             attr {
-                text("自选股票  $count")
+                text("自选股票  ${page.favoriteQuotes().size}")
                 fontSize(14f)
                 fontWeightBold()
                 color(StockDesignTokens.primaryText)
@@ -303,25 +363,31 @@ private fun ViewContainer<*, *>.StockWatchlistToolbar(page: StockHomePage) {
         }
         Text {
             attr {
-                text("默认排序  ⇅")
+                text(if (page.watchlistEditing) "拖动右侧手柄排序" else "手动排序")
                 fontSize(12f)
-                fontWeightMedium()
-                color(StockDesignTokens.brand)
-                marginRight(16f)
+                color(StockDesignTokens.secondaryText)
+                marginRight(8f)
             }
         }
-        Text {
+        View {
             attr {
-                text("编辑")
-                fontSize(12f)
-                fontWeightMedium()
-                color(StockDesignTokens.brand)
+                width(56f)
+                height(44f)
+                allCenter()
+            }
+            event { click { page.updateWatchlistEditing(!page.watchlistEditing) } }
+            Text {
+                attr {
+                    text(if (page.watchlistEditing) "完成" else "编辑")
+                    fontSize(13f)
+                    fontWeightBold()
+                    color(StockDesignTokens.brand)
+                }
             }
         }
     }
 }
 
-// 股票列表
 private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
     View {
         attr {
@@ -329,156 +395,139 @@ private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
             borderRadius(12f)
             marginTop(8f)
         }
-        // 使用自选页专用的表头，显示三列数据
         StockWatchlistQuoteHeader(page.stockContentWidth())
-        // 表头分割线
+        View { attr { height(1f); backgroundColor(StockDesignTokens.divider); marginLeft(16f) } }
+        page.favoriteQuotes().forEach { quote ->
+            StockWatchlistQuoteRow(
+                quote = quote,
+                width = page.stockContentWidth(),
+                favorite = { quote.code in page.favoriteCodes },
+                onFavorite = { page.toggleFavorite(quote.code) },
+                editing = { page.watchlistEditing },
+                onRemove = { page.removeFavorite(quote.code) },
+                onDrag = { state, y -> page.dragFavorite(quote.code, state, y) },
+                onClick = { if (!page.watchlistEditing) page.openDetail(quote.code) },
+            )
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.StockSearchResults(page: StockHomePage) {
+    val results = page.searchResults()
+    vif({ results.isNotEmpty() }) {
         View {
             attr {
-                height(1f)
-                backgroundColor(StockDesignTokens.divider)
-                marginLeft(16f)
+                backgroundColor(StockDesignTokens.surface)
+                borderRadius(12f)
+                marginTop(12f)
+            }
+            View {
+                attr { height(44f); padding(left = 16f, right = 16f); flexDirectionRow(); alignItemsCenter() }
+                Text { attr { text("搜索结果  ${results.size}"); fontSize(14f); fontWeightBold(); color(StockDesignTokens.primaryText); flex(1f) } }
+                Text { attr { text("可收藏或进入详情"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
+            }
+            results.forEach { quote ->
+                StockWatchlistQuoteRow(
+                    quote = quote,
+                    width = page.stockContentWidth(),
+                    favorite = { quote.code in page.favoriteCodes },
+                    onFavorite = { page.toggleFavorite(quote.code) },
+                    onClick = { page.openDetail(quote.code) },
+                )
             }
         }
-        page.quotes.forEach { quote ->
-            vif({ quote.code in page.favoriteCodes }) {
-                // 使用自选页专用的股票行，显示三列数据
-                StockWatchlistQuoteRow(
-                    quote,
-                    page.stockContentWidth(),
-                    { quote.code in page.favoriteCodes },
-                    { page.toggleFavorite(quote.code) },
-                ) { page.openDetail(quote.code) }
+    }
+    velse {
+        StockSimpleEmptyState("未找到匹配股票", "请尝试股票名称或六位代码")
+    }
+}
+
+private fun ViewContainer<*, *>.StockHoldingsList(page: StockHomePage) {
+    View {
+        attr { marginTop(12f) }
+        page.holdingRows().forEach { (position, quote) ->
+            val marketValue = quote.price * position.quantity
+            val profit = (quote.price - position.averageCost) * position.quantity
+            View {
+                attr {
+                    backgroundColor(StockDesignTokens.surface)
+                    borderRadius(12f)
+                    padding(16f)
+                    marginBottom(10f)
+                }
+                event { click { page.openDetail(quote.code) } }
+                View {
+                    attr { flexDirectionRow(); alignItemsCenter() }
+                    View {
+                        attr { flex(1f) }
+                        Text { attr { text(quote.name); fontSize(16f); fontWeightBold(); color(StockDesignTokens.primaryText) } }
+                        Text { attr { text(quote.code); fontSize(11f); color(StockDesignTokens.secondaryText); marginTop(3f) } }
+                    }
+                    Text { attr { text(formatStockPrice(quote.price)); fontSize(17f); fontWeightBold(); color(stockChangeColor(quote.change)) } }
+                }
+                View {
+                    attr { flexDirectionRow(); marginTop(14f) }
+                    StockHoldingMetric("持仓", "${position.quantity}股")
+                    StockHoldingMetric("平均成本", formatStockPrice(position.averageCost))
+                    StockHoldingMetric("市值", formatStockPrice(marketValue))
+                    StockHoldingMetric("浮动盈亏", formatStockSigned(profit), stockChangeColor(profit))
+                }
             }
         }
     }
 }
 
-// 底部更新时间
-private fun ViewContainer<*, *>.StockWatchlistFooter(page: StockHomePage) {
+private fun ViewContainer<*, *>.StockHoldingMetric(label: String, value: String, valueColor: Color = StockDesignTokens.primaryText) {
     View {
+        attr { flex(1f) }
+        Text { attr { text(label); fontSize(10f); color(StockDesignTokens.tertiaryText) } }
+        Text { attr { text(value); fontSize(12f); fontWeightSemiBold(); color(valueColor); marginTop(4f) } }
+    }
+}
+
+private fun ViewContainer<*, *>.StockWatchlistFooter() {
+    Text {
         attr {
-            flexDirectionRow()
-            alignItemsCenter()
+            text("行情更新时间  2026-09-10 15:00  ·  演示数据")
+            fontSize(11f)
+            color(StockDesignTokens.tertiaryText)
             marginTop(12f)
         }
-        Text {
-            attr {
-                text("行情更新时间  2026-09-09 15:00  ·  演示数据")
-                fontSize(11f)
-                color(StockDesignTokens.tertiaryText)
-                flex(1f)
-            }
-        }
-        Text {
-            attr {
-                text("↻")
-                fontSize(14f)
-                color(StockDesignTokens.tertiaryText)
-            }
-        }
     }
 }
 
-// 空状态
 private fun ViewContainer<*, *>.StockWatchlistEmptyState(page: StockHomePage) {
+    StockSimpleEmptyState("暂无自选股票", "去行情页收藏，或直接使用上方搜索框")
     View {
         attr {
-            backgroundColor(StockDesignTokens.surface)
+            width(136f)
+            height(44f)
+            backgroundColor(StockDesignTokens.brand)
             borderRadius(12f)
-            padding(top = 48f, bottom = 48f)
-            marginTop(64f)
             allCenter()
+            alignSelfCenter()
+            marginTop(16f)
         }
-        // 空状态图标底
-        View {
-            attr {
-                width(80f)
-                height(80f)
-                backgroundColor(StockDesignTokens.brandBackground)
-                borderRadius(40f)
-                allCenter()
-            }
-            Text {
-                attr {
-                    text("☆")
-                    fontSize(42f)
-                    color(StockDesignTokens.brand)
-                }
-            }
-        }
-        Text {
-            attr {
-                text("暂无自选股票")
-                fontSize(18f)
-                fontWeightBold()
-                color(StockDesignTokens.primaryText)
-                marginTop(20f)
-            }
-        }
-        Text {
-            attr {
-                text("去行情页收藏感兴趣的股票")
-                fontSize(14f)
-                color(StockDesignTokens.secondaryText)
-                marginTop(14f)
-            }
-        }
-        // 去行情添加按钮
-        View {
-            attr {
-                width(136f)
-                height(44f)
-                backgroundColor(StockDesignTokens.brand)
-                borderRadius(12f)
-                allCenter()
-                marginTop(28f)
-            }
-            event { click { page.selectedTab = StockTabs.MARKET } }
-            Text {
-                attr {
-                    text("去行情添加  →")
-                    fontSize(14f)
-                    fontWeightMedium()
-                    color(Color.WHITE)
-                }
-            }
-        }
-        Text {
-            attr {
-                text("也可直接用上方搜索框查找")
-                fontSize(11f)
-                color(StockDesignTokens.tertiaryText)
-                marginTop(20f)
-            }
-        }
+        event { click { page.selectedTab = StockTabs.MARKET } }
+        Text { attr { text("去行情添加  →"); fontSize(14f); fontWeightMedium(); color(Color.WHITE) } }
     }
 }
 
-// 持仓股空状态（暂无演示数据）
-private fun ViewContainer<*, *>.StockHoldingsEmptyState(page: StockHomePage) {
+private fun ViewContainer<*, *>.StockHoldingsEmptyState() {
+    StockSimpleEmptyState("暂无持仓股票", "可在个股详情页模拟买入")
+}
+
+private fun ViewContainer<*, *>.StockSimpleEmptyState(title: String, message: String) {
     View {
         attr {
             backgroundColor(StockDesignTokens.surface)
             borderRadius(12f)
             padding(top = 48f, bottom = 48f)
-            marginTop(64f)
+            marginTop(48f)
             allCenter()
         }
-        Text {
-            attr {
-                text("暂无演示数据")
-                fontSize(18f)
-                fontWeightBold()
-                color(StockDesignTokens.primaryText)
-            }
-        }
-        Text {
-            attr {
-                text("持仓股功能尚未开放")
-                fontSize(14f)
-                color(StockDesignTokens.secondaryText)
-                marginTop(14f)
-            }
-        }
+        Text { attr { text("☆"); fontSize(42f); color(StockDesignTokens.brand) } }
+        Text { attr { text(title); fontSize(18f); fontWeightBold(); color(StockDesignTokens.primaryText); marginTop(16f) } }
+        Text { attr { text(message); fontSize(14f); color(StockDesignTokens.secondaryText); marginTop(10f) } }
     }
 }

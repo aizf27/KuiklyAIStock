@@ -23,6 +23,20 @@ internal object StockDesignTokens {
     val informationCardBackground = Color(0xFFE9EDF3)
     val informationCardShadow = Color(0xFFD7DEE8)
     val transparent = Color(0x00000000)
+    val aiStrongText = Color(0xFFB42318)
+    val aiStrongBackground = Color(0xFFFFF1F1)
+    val aiSidewaysText = Color(0xFFB54708)
+    val aiSidewaysBackground = Color(0xFFFFFAEB)
+    val aiWeakText = Color(0xFF087A4D)
+    val aiWeakBackground = Color(0xFFEDF8F3)
+    val aiRiskHighText = Color(0xFFB42318)
+    val aiRiskHighBackground = Color(0xFFFFF1F1)
+    val aiRiskMediumText = Color(0xFFB54708)
+    val aiRiskMediumBackground = Color(0xFFFFFAEB)
+    val aiRiskLowText = Color(0xFF087A4D)
+    val aiRiskLowBackground = Color(0xFFEDF8F3)
+    val aiPlanBackground = Color(0xFFF0F5FF)
+    val aiControlBackground = Color(0xFFF0F2F5)
 
     const val pageHorizontalPadding = 16f
     const val pageBottomSpacing = 24f

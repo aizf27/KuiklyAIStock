@@ -3,6 +3,8 @@ package com.example.kuiklyaistock
 import com.example.kuiklyaistock.model.StockQuote
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.directives.vif
+import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import kotlin.math.abs
@@ -91,6 +93,9 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
     width: Float,
     favorite: () -> Boolean = { false },
     onFavorite: () -> Unit = {},
+    editing: () -> Boolean = { false },
+    onRemove: () -> Unit = {},
+    onDrag: (String, Float) -> Unit = { _, _ -> },
     onClick: () -> Unit,
 ) {
     View {
@@ -103,7 +108,7 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
             alignItemsCenter()
         }
         event {
-            click { onClick() }
+            click { if (!editing()) onClick() }
         }
         View {
             attr {
@@ -111,12 +116,12 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
                 height(StockDesignTokens.minimumTouchTarget)
                 allCenter()
             }
-            event { click { onFavorite() } }
+            event { click { if (editing()) onRemove() else onFavorite() } }
             Text {
                 attr {
-                    text(if (favorite()) "★" else "☆")
-                    fontSize(20f)
-                    color(if (favorite()) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
+                    text(if (editing()) "−" else if (favorite()) "★" else "☆")
+                    fontSize(if (editing()) 24f else 20f)
+                    color(if (editing()) StockDesignTokens.fall else if (favorite()) StockDesignTokens.risk else StockDesignTokens.tertiaryText)
                 }
             }
         }
@@ -194,6 +199,19 @@ internal fun ViewContainer<*, *>.StockWatchlistQuoteRow(
                         color(stockChangeColor(quote.change))
                     }
                 }
+            }
+        }
+        vif({ editing() }) {
+            View {
+                attr {
+                    width(36f)
+                    height(StockDesignTokens.minimumTouchTarget)
+                    allCenter()
+                }
+                event {
+                    pan { params -> onDrag(params.state, params.y) }
+                }
+                Text { attr { text("≡"); fontSize(22f); color(StockDesignTokens.secondaryText) } }
             }
         }
     }
@@ -445,86 +463,41 @@ internal fun ViewContainer<*, *>.StockWatchlistTabs(
     selectedTab: () -> String,
     onTabSelected: (String) -> Unit,
 ) {
+    val tabs = listOf(
+        WatchlistTabs.WATCHLIST to "自选股",
+        WatchlistTabs.HOLDINGS to "持仓股",
+    )
     View {
         attr {
             width(width)
             height(48f)
             backgroundColor(StockDesignTokens.surface)
             flexDirectionRow()
-            alignItemsCenter()
         }
-        // 自选股 Tab
-        View {
-            attr {
-                flex(1f)
-                height(48f)
-                allCenter()
-            }
-            event { click { onTabSelected(WatchlistTabs.WATCHLIST) } }
-            Text {
+        tabs.forEach { (tab, label) ->
+            View {
                 attr {
-                    text("自选股")
-                    fontSize(16f)
-                    if (selectedTab() == WatchlistTabs.WATCHLIST) fontWeightBold() else fontWeightMedium()
-                    color(if (selectedTab() == WatchlistTabs.WATCHLIST) StockDesignTokens.primaryText else StockDesignTokens.secondaryText)
+                    flex(1f)
+                    height(48f)
+                    alignItemsCenter()
+                    justifyContentCenter()
                 }
-            }
-        }
-        // 持仓股 Tab
-        View {
-            attr {
-                flex(1f)
-                height(48f)
-                allCenter()
-            }
-            event { click { onTabSelected(WatchlistTabs.HOLDINGS) } }
-            Text {
-                attr {
-                    text("持仓股")
-                    fontSize(16f)
-                    if (selectedTab() == WatchlistTabs.HOLDINGS) fontWeightBold() else fontWeightMedium()
-                    color(if (selectedTab() == WatchlistTabs.HOLDINGS) StockDesignTokens.primaryText else StockDesignTokens.secondaryText)
-                }
-            }
-        }
-    }
-    // 选中指示线
-    View {
-        attr {
-            width(width)
-            height(3f)
-            flexDirectionRow()
-        }
-        View {
-            attr {
-                flex(1f)
-                height(3f)
-                allCenter()
-            }
-            if (selectedTab() == WatchlistTabs.WATCHLIST) {
-                View {
+                event { click { onTabSelected(tab) } }
+                Text {
                     attr {
-                        width(40f)
-                        height(3f)
-                        backgroundColor(StockDesignTokens.brand)
-                        borderRadius(2f)
+                        text(label)
+                        fontSize(16f)
+                        if (selectedTab() == tab) fontWeightBold() else fontWeightMedium()
+                        color(if (selectedTab() == tab) StockDesignTokens.primaryText else StockDesignTokens.secondaryText)
                     }
                 }
-            }
-        }
-        View {
-            attr {
-                flex(1f)
-                height(3f)
-                allCenter()
-            }
-            if (selectedTab() == WatchlistTabs.HOLDINGS) {
                 View {
                     attr {
-                        width(40f)
-                        height(3f)
-                        backgroundColor(StockDesignTokens.brand)
-                        borderRadius(2f)
+                        width(if (selectedTab() == tab) 28f else 0f)
+                        height(2f)
+                        backgroundColor(if (selectedTab() == tab) StockDesignTokens.brand else StockDesignTokens.transparent)
+                        borderRadius(1f)
+                        marginTop(7f)
                     }
                 }
             }
@@ -538,7 +511,6 @@ internal object WatchlistTabs {
     const val HOLDINGS = "持仓股"
 }
 
-// 搜索输入框组件
 internal fun ViewContainer<*, *>.StockSearchInput(
     value: String,
     placeholder: String,
