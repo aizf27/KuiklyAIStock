@@ -75,9 +75,11 @@ internal class StockHomePage : BasePager() {
     internal var currentClockText by observable("--:--")
     internal var currentDateText by observable("")
     private var removePortfolioObserver: (() -> Unit)? = null
-    private var draggingFavoriteCode = ""
+    internal var draggingFavoriteCode by observable("") // 改为 observable，用于实时渲染
     private var dragStartY = 0f
-    private var dragCurrentIndex = -1
+    internal var dragOffsetY by observable(0f) // 拖动的垂直偏移量
+    internal var dragCurrentIndex by observable(-1) // 改为 internal observable
+    internal var dragTargetIndex by observable(-1) // 拖动目标索引
     private val contentRequests = StockRequestTracker()
     private var marketClockActive = false
     private var quoteRefreshActive = false
@@ -363,18 +365,25 @@ internal class StockHomePage : BasePager() {
                 if (!watchlistEditing || favoriteCodes.size < 2) return
                 draggingFavoriteCode = code
                 dragStartY = y
+                dragOffsetY = 0f
                 dragCurrentIndex = favoriteCodes.indexOf(code)
+                dragTargetIndex = dragCurrentIndex
             }
             "move" -> {
                 if (draggingFavoriteCode != code || dragCurrentIndex < 0 || favoriteCodes.size < 2) return
-                val offsetRows = ((y - dragStartY) / StockDesignTokens.quoteRowHeight).toInt()
-                val target = (dragCurrentIndex + offsetRows).coerceIn(0, favoriteCodes.lastIndex)
-                if (target != dragCurrentIndex && PortfolioStore.moveFavorite(dragCurrentIndex, target)) {
-                    dragCurrentIndex = target
-                    dragStartY = y
-                }
+                // 计算拖动偏移量
+                dragOffsetY = y - dragStartY
+                // 计算目标位置索引
+                val offsetRows = (dragOffsetY / StockDesignTokens.quoteRowHeight).toInt()
+                dragTargetIndex = (dragCurrentIndex + offsetRows).coerceIn(0, favoriteCodes.lastIndex)
             }
-            "end", "cancel" -> finishFavoriteDrag()
+            "end", "cancel" -> {
+                if (draggingFavoriteCode.isNotEmpty() && dragTargetIndex != dragCurrentIndex) {
+                    // 释放时才真正更新数据
+                    PortfolioStore.moveFavorite(dragCurrentIndex, dragTargetIndex)
+                }
+                finishFavoriteDrag()
+            }
         }
     }
 
@@ -385,6 +394,8 @@ internal class StockHomePage : BasePager() {
         }
         draggingFavoriteCode = ""
         dragCurrentIndex = -1
+        dragTargetIndex = -1
+        dragOffsetY = 0f
         dragStartY = 0f
     }
 }
@@ -501,9 +512,27 @@ private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
         }
         StockWatchlistQuoteHeader(page.stockContentWidth())
         View { attr { height(1f); backgroundColor(StockDesignTokens.divider); marginLeft(16f) } }
-        // 使用 vfor 遍历可观察列表，拖动排序时自动响应变化
+        // 使用 vfor 遍历可观察列表，添加拖动视觉效果
         vfor({ page.observableFavoriteQuotes() }) { quote ->
+            val currentIndex = page.favoriteCodes.indexOf(quote.code)
+            val isDragging = quote.code == page.draggingFavoriteCode
+            val shouldShiftUp = !isDragging && page.draggingFavoriteCode.isNotEmpty()
+                && currentIndex > page.dragCurrentIndex && currentIndex <= page.dragTargetIndex
+            val shouldShiftDown = !isDragging && page.draggingFavoriteCode.isNotEmpty()
+                && currentIndex < page.dragCurrentIndex && currentIndex >= page.dragTargetIndex
+
+            // 计算视觉偏移量
+            val visualOffset = when {
+                isDragging -> page.dragOffsetY // 被拖动的卡片跟随手指
+                shouldShiftUp -> -StockDesignTokens.quoteRowHeight // 向上让位
+                shouldShiftDown -> StockDesignTokens.quoteRowHeight // 向下让位
+                else -> 0f
+            }
+
             View {
+                attr {
+                    marginTop(visualOffset) // 应用视觉偏移
+                }
                 StockWatchlistQuoteRow(
                     quote = quote,
                     width = page.stockContentWidth(),
