@@ -5,6 +5,7 @@ import com.example.kuiklyaistock.model.AiMarketOverview
 import com.example.kuiklyaistock.model.AiStockInsight
 import com.example.kuiklyaistock.model.MarketIndexQuote
 import com.example.kuiklyaistock.model.MarketSummary
+import com.example.kuiklyaistock.model.StockDataSource
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.TrendPoint
@@ -23,11 +24,21 @@ sealed class StockLoadResult<out T> {
 data class StockHomeData(
     val quotes: List<StockQuote>,
     val marketSummary: MarketSummary,
+    val dataSource: StockDataSource = StockDataSource.MOCK,
+    val quoteTime: String = "",
+    val requestCompletedAt: Long = 0L,
+    val isExpired: Boolean = false,
+    val missingCodes: List<String> = emptyList(),
 )
 
 data class StockDetailData(
     val detail: StockDetail,
     val analysis: AiAnalysis?,
+    val dataSource: StockDataSource = StockDataSource.MOCK,
+    val quoteTime: String = detail.quote.updatedAt,
+    val requestCompletedAt: Long = 0L,
+    val isExpired: Boolean = false,
+    val missingCodes: List<String> = emptyList(),
 )
 
 data class StockAiData(
@@ -41,7 +52,7 @@ enum class StockRequestType {
     AI,
 }
 
-// 股票数据仓库，后续可替换为真实行情服务。
+// 股票数据仓库，真实行情和 Mock 实现共用此接口。
 interface StockRepository {
     suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData>
     suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData>

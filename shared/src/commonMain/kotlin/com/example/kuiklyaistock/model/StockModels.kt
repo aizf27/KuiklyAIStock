@@ -1,5 +1,17 @@
 package com.example.kuiklyaistock.model
 
+// 行情数据来源。
+enum class StockDataSource {
+    REMOTE,
+    CACHE,
+    MOCK,
+}
+
+internal fun StockDataSource.displayName(): String = when (this) {
+    StockDataSource.REMOTE -> "真实行情"
+    StockDataSource.CACHE -> "缓存行情"
+    StockDataSource.MOCK -> "Mock 行情"
+}
 // 列表页使用的股票报价摘要。
 data class StockQuote(
     val name: String,
