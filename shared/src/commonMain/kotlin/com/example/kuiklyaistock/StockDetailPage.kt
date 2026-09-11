@@ -292,10 +292,26 @@ internal class StockDetailPage : BasePager() {
 
     private fun refreshChartData(stock: StockDetail) {
         chartCandles.clear()
-        if (dataSource == StockDataSource.MOCK) {
+
+        // 根据选择的周期从数据库加载对应的K线数据
+        val data = when (selectedChartPeriod) {
+            StockChartPeriod.INTRADAY -> stock.intradayTrend.map {
+                OhlcPoint(it.label, it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.volume.toFloat())
+            }
+            StockChartPeriod.FIVE_DAY -> stock.fiveDayTrend.map {
+                OhlcPoint(it.label, it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.price.toFloat(), it.volume.toFloat())
+            }
+            StockChartPeriod.DAILY -> stock.dailyKLine
+            StockChartPeriod.WEEKLY -> stock.weeklyKLine
+            StockChartPeriod.MONTHLY -> stock.monthlyKLine
+        }
+
+        if (data.isNotEmpty()) {
+            chartCandles.addAll(data)
+        } else if (dataSource == StockDataSource.MOCK) {
+            // 仅当数据库无数据且是MOCK源时才使用模拟数据
             chartCandles.addAll(mockStockCandles(stock, selectedChartPeriod))
         }
-        // 真实行情暂未提供时序接口，保持空图表，不生成伪造 K 线。
     }
 
     private fun resetAiInteractionState() {

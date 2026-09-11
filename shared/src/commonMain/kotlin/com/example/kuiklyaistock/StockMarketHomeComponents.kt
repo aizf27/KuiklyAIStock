@@ -25,7 +25,24 @@ internal fun ViewContainer<*, *>.StockMarketHomeHeader(page: StockHomePage) {
             backgroundColor(StockDesignTokens.pageBackground)
             padding(left = StockDesignTokens.pageHorizontalPadding, right = StockDesignTokens.pageHorizontalPadding, top = 12f)
         }
-        StockSearchBar(page, page.stockContentWidth())
+        View {
+            attr {
+                width(page.stockContentWidth())
+                flexDirectionRow()
+                alignItemsCenter()
+            }
+            View { attr { flex(1f) }; StockSearchBar(page) }
+            View {
+                attr {
+                    width(44f)
+                    height(44f)
+                    allCenter()
+                    marginLeft(8f)
+                }
+                event { click { page.manualRefresh() } }
+                Text { attr { text("↻"); fontSize(22f); color(StockDesignTokens.brand) } }
+            }
+        }
         StockCategoryTabs(
             labels = StockMarketCategories.all,
             selected = { page.selectedMarketCategory },
@@ -72,10 +89,10 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
     }
 }
 
-private fun ViewContainer<*, *>.StockSearchBar(page: StockHomePage, width: Float) {
+private fun ViewContainer<*, *>.StockSearchBar(page: StockHomePage) {
     View {
         attr {
-            width(width)
+            flex(1f)
             height(44f)
             backgroundColor(StockDesignTokens.controlBackground)
             borderRadius(StockDesignTokens.sectionRadius)

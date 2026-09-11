@@ -263,6 +263,11 @@ internal class StockHomePage : BasePager() {
         openStockDetail(code)
     }
 
+    internal fun manualRefresh() {
+        acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 手动刷新")
+        loadContent()
+    }
+
     internal fun toggleFavorite(code: String) {
         val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
         val favorite = PortfolioStore.toggleFavorite(code)
