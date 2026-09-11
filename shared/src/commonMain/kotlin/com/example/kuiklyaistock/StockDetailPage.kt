@@ -76,6 +76,7 @@ internal class StockDetailPage : BasePager() {
     private var quoteRefreshActive = false
     private var detailLoading = false
     private var analyzedQuoteTime = ""
+    private var currentDisplayTime by observable("") // 实时显示的当前时间
 
     override fun created() {
         super.created()
@@ -96,6 +97,8 @@ internal class StockDetailPage : BasePager() {
         }
         loadDetail()
         scheduleQuoteRefresh()
+        updateCurrentTime() // 初始化当前时间
+        scheduleTimeUpdate() // 定时更新当前时间
     }
 
     override fun onDestroyPager() {
@@ -140,7 +143,7 @@ internal class StockDetailPage : BasePager() {
                                 width = ctx.stockContentWidth(),
                                 isFavorite = { ctx.isFavorite(stock.quote.code) },
                                 onFavorite = { ctx.toggleFavorite(stock.quote.code) },
-                                sourceLabel = "${ctx.dataSource.displayName()} · ${ctx.quoteTime.ifEmpty { stock.quote.updatedAt }}${if (ctx.quoteExpired) " · 已过期" else ""}"
+                                sourceLabel = "${ctx.dataSource.displayName()} · ${ctx.currentDisplayTime}${if (ctx.quoteExpired) " · 已过期" else ""}"
                             )
 
                             // 使用新的K线图区组件
@@ -276,6 +279,20 @@ internal class StockDetailPage : BasePager() {
             if (quoteRefreshActive) {
                 loadDetail()
                 scheduleQuoteRefresh()
+            }
+        }
+    }
+
+    private fun updateCurrentTime() {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        currentDisplayTime = formatTimestamp(bridge.currentTimeStamp())
+    }
+
+    private fun scheduleTimeUpdate() {
+        setTimeout(1_000) { // 每秒更新一次时间
+            if (quoteRefreshActive) {
+                updateCurrentTime()
+                scheduleTimeUpdate()
             }
         }
     }
