@@ -4,6 +4,7 @@ import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.displayName
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.directives.velse
+import com.tencent.kuikly.core.directives.vfor
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.views.Scroller
@@ -34,13 +35,15 @@ internal fun ViewContainer<*, *>.StockMarketHomeHeader(page: StockHomePage) {
             View { attr { flex(1f) }; StockSearchBar(page) }
             View {
                 attr {
-                    width(44f)
+                    width(56f)
                     height(44f)
                     allCenter()
                     marginLeft(8f)
+                    backgroundColor(StockDesignTokens.controlBackground)
+                    borderRadius(StockDesignTokens.sectionRadius)
                 }
                 event { click { page.manualRefresh() } }
-                Text { attr { text("↻"); fontSize(22f); color(StockDesignTokens.brand) } }
+                Text { attr { text("刷新"); fontSize(13f); fontWeightBold(); color(StockDesignTokens.brand) } }
             }
         }
         StockCategoryTabs(
@@ -61,29 +64,77 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
                 alignSelfCenter()
                 padding(top = StockDesignTokens.sectionSpacing, bottom = StockDesignTokens.pageBottomSpacing)
             }
-            vif({ page.selectedMarketCategory != StockMarketCategories.MARKET }) {
-                StockMarketEmptyState(
-                    page.stockContentWidth(),
-                    "${page.selectedMarketCategory}暂未接入真实数据",
-                    "当前版本先提供大盘行情",
-                )
+            vif({ page.searchText.trim().isNotEmpty() }) {
+                StockMarketSearchResults(page, page.stockContentWidth())
             }
             velse {
-                StockMarketDashboard(
-                    summary = page.marketSummary,
-                    width = page.stockContentWidth(),
-                    minuteOfDay = page.currentMinuteOfDay,
-                    sourceLabel = page.dataSource.displayName(),
-                    quoteTime = page.quoteTime,
-                    expired = page.quoteExpired,
-                    missingCount = page.missingQuoteCodes.size,
-                )
-                StockTimelyInformationCard(
-                    width = page.stockContentWidth(),
-                    minuteOfDay = page.currentMinuteOfDay,
-                    dateText = page.currentDateText,
-                )
-                StockRankingCard(page, page.filteredMarketQuotes(), page.stockContentWidth())
+                vif({ page.selectedMarketCategory != StockMarketCategories.MARKET }) {
+                    StockMarketEmptyState(
+                        page.stockContentWidth(),
+                        "${page.selectedMarketCategory}暂未接入真实数据",
+                        "当前版本先提供大盘行情",
+                    )
+                }
+                velse {
+                    StockMarketDashboard(
+                        summary = page.marketSummary,
+                        width = page.stockContentWidth(),
+                        minuteOfDay = page.currentMinuteOfDay,
+                        sourceLabel = page.dataSource.displayName(),
+                        quoteTime = page.quoteTime,
+                        expired = page.quoteExpired,
+                        missingCount = page.missingQuoteCodes.size,
+                    )
+                    StockTimelyInformationCard(
+                        width = page.stockContentWidth(),
+                        minuteOfDay = page.currentMinuteOfDay,
+                        dateText = page.currentDateText,
+                    )
+                    StockRankingCard(page, page.filteredMarketQuotes(), page.stockContentWidth())
+                }
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.StockMarketSearchResults(page: StockHomePage, width: Float) {
+    View {
+        attr {
+            width(width)
+            backgroundColor(StockDesignTokens.surface)
+            borderRadius(StockDesignTokens.sectionRadius)
+            padding(left = StockDesignTokens.cardPadding, right = StockDesignTokens.cardPadding)
+        }
+        val contentWidth = (width - StockDesignTokens.cardPadding * 2f).coerceAtLeast(0f)
+        View {
+            attr { width(contentWidth); height(48f); flexDirectionRow(); alignItemsCenter() }
+            Text { attr { text("搜索结果"); fontSize(16f); fontWeightBold(); color(StockDesignTokens.primaryText); flex(1f) } }
+            View {
+                attr { height(44f); padding(left = 12f, right = 4f); allCenter() }
+                event { click { page.updateSearchText("") } }
+                Text { attr { text("清除"); fontSize(13f); fontWeightBold(); color(StockDesignTokens.brand) } }
+            }
+        }
+        // 直接在 lambda 中访问可观察列表，确保响应式判断
+        vif({ page.observableSearchResults().isEmpty() }) {
+            View {
+                attr { width(contentWidth); padding(top = 36f, bottom = 36f); allCenter() }
+                Text { attr { text("未找到匹配股票，请尝试股票名称或六位代码"); fontSize(14f); color(StockDesignTokens.secondaryText) } }
+            }
+        }
+        velse {
+            StockRankingHeader(contentWidth)
+            vfor({ page.observableSearchResults() }) { quote ->
+                View {
+                    StockRankingRow(
+                        quote = quote,
+                        width = contentWidth,
+                        favorite = { quote.code in page.favoriteCodes },
+                        onFavorite = { page.toggleFavorite(quote.code) },
+                        onClick = { page.openDetail(quote.code) },
+                    )
+                    View { attr { width(contentWidth); height(1f); backgroundColor(StockDesignTokens.divider) } }
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.repository.TencentStockRepository
 import com.example.kuiklyaistock.repository.PortfolioPersistence
 import com.example.kuiklyaistock.repository.PortfolioStore
+import com.example.kuiklyaistock.repository.StockHomeData
 import com.example.kuiklyaistock.repository.StockLoadResult
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockRequestTracker
@@ -26,9 +27,12 @@ import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.directives.velse
 import com.tencent.kuikly.core.directives.velseif
+import com.tencent.kuikly.core.directives.vfor
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
+import com.tencent.kuikly.core.reactive.collection.ObservableList
 import com.tencent.kuikly.core.reactive.handler.observable
+import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.Scroller
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
@@ -65,6 +69,7 @@ internal class StockHomePage : BasePager() {
     internal var selectedMarketCategory by observable(StockMarketCategories.MARKET)
     internal var selectedWatchlistTab by observable(WatchlistTabs.WATCHLIST)
     internal var searchText by observable("")
+    private var searchQuoteResults by observableList<StockQuote>()
     internal var currentMinuteOfDay by observable(15 * 60)
     internal var currentClockText by observable("--:--")
     internal var currentDateText by observable("")
@@ -154,28 +159,46 @@ internal class StockHomePage : BasePager() {
         if (contentLoading) return
         contentLoading = true
         val requestId = contentRequests.next()
-        loading = true
+        loading = !hasSelectedTabContent()
         errorMessage = ""
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 开始加载: $requestId")
         lifecycleScope.launch {
-            val homeResult = repository.loadHome(this)
+            var hasHomeContent = marketSummary != null && quotes.isNotEmpty()
+            val cachedResult = repository.loadHome(this)
             if (!contentRequests.isLatest(requestId)) {
                 contentLoading = false
-                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 丢弃过期行情结果: $requestId")
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 丢弃过期缓存结果: $requestId")
                 return@launch
             }
-            when (homeResult) {
+            when (cachedResult) {
                 is StockLoadResult.Success -> {
-                    // 先写入概览，再展示行情内容，避免首次渲染停留在同步状态。
-                    marketSummary = homeResult.data.marketSummary
-                    quotes = homeResult.data.quotes
-                    dataSource = homeResult.data.dataSource
-                    quoteTime = homeResult.data.quoteTime
-                    quoteExpired = homeResult.data.isExpired
-                    missingQuoteCodes = homeResult.data.missingCodes
+                    applyHomeData(cachedResult.data)
+                    hasHomeContent = cachedResult.data.quotes.isNotEmpty()
+                    loading = false
+                    acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 已展示数据库缓存: $requestId")
                 }
-                StockLoadResult.Empty -> errorMessage = "暂无行情数据"
-                is StockLoadResult.Failure -> errorMessage = homeResult.message
+                StockLoadResult.Empty -> Unit
+                is StockLoadResult.Failure -> errorMessage = cachedResult.message
+            }
+
+            val refreshResult = repository.refreshHome(this)
+            if (!contentRequests.isLatest(requestId)) {
+                contentLoading = false
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 丢弃过期网络结果: $requestId")
+                return@launch
+            }
+            when (refreshResult) {
+                is StockLoadResult.Success -> {
+                    applyHomeData(refreshResult.data)
+                    hasHomeContent = refreshResult.data.quotes.isNotEmpty()
+                    errorMessage = ""
+                    acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 网络行情已替换缓存: $requestId")
+                }
+                StockLoadResult.Empty -> errorMessage = if (hasHomeContent) "最新行情为空，点击重试" else "暂无行情数据"
+                is StockLoadResult.Failure -> {
+                    errorMessage = if (hasHomeContent) "最新行情加载失败，点击重试" else refreshResult.message
+                    acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 网络刷新失败，保留缓存: ${refreshResult.message}")
+                }
             }
 
             val aiResult = repository.loadAi(this)
@@ -189,17 +212,27 @@ internal class StockHomePage : BasePager() {
                     overview = aiResult.data.overview
                     insights = aiResult.data.insights
                 }
-                StockLoadResult.Empty -> if (errorMessage.isEmpty()) errorMessage = "暂无 AI 解读数据"
-                is StockLoadResult.Failure -> if (errorMessage.isEmpty()) errorMessage = aiResult.message
+                StockLoadResult.Empty -> if (errorMessage.isEmpty() && !hasHomeContent) errorMessage = "暂无 AI 解读数据"
+                is StockLoadResult.Failure -> if (errorMessage.isEmpty() && !hasHomeContent) errorMessage = aiResult.message
             }
             loading = false
             contentLoading = false
             if (errorMessage.isEmpty()) {
                 acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 加载成功: $requestId")
             } else {
-                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 加载失败: $errorMessage")
+                acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 加载完成并提示重试: $errorMessage")
             }
         }
+    }
+
+    private fun applyHomeData(data: StockHomeData) {
+        marketSummary = data.marketSummary
+        quotes = data.quotes
+        updateSearchResults()
+        dataSource = data.dataSource
+        quoteTime = data.quoteTime
+        quoteExpired = data.isExpired
+        missingQuoteCodes = data.missingCodes
     }
 
     private fun refreshMarketClock() {
@@ -240,16 +273,25 @@ internal class StockHomePage : BasePager() {
         else -> marketSummary != null && quotes.isNotEmpty()
     }
 
-    internal fun filteredMarketQuotes(): List<StockQuote> = searchStockQuotes(quotes, searchText)
+    internal fun filteredMarketQuotes(): List<StockQuote> = searchQuoteResults
+
+    internal fun observableSearchResults(): ObservableList<StockQuote> = searchQuoteResults
 
     internal fun updateSearchText(text: String) {
         searchText = text
+        updateSearchResults()
     }
 
     internal fun submitSearch(text: String) {
         searchText = text
+        updateSearchResults()
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).closeKeyboard(JSONObject())
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_home 提交搜索: ${text.trim()}")
+    }
+
+    private fun updateSearchResults() {
+        searchQuoteResults.clear()
+        searchQuoteResults.addAll(searchStockQuotes(quotes, searchText))
     }
 
     internal fun selectMarketCategory(category: String) {
@@ -337,7 +379,7 @@ private fun ViewContainer<*, *>.StockWatchlistContent(page: StockHomePage) {
     View {
         attr { flex(1f) }
         StockWatchlistTopArea(page)
-        StockWatchlistTabs(page.stockContentWidth(), { page.selectedWatchlistTab }) { tab ->
+        StockWatchlistTabs(page.pagerData.pageViewWidth, { page.selectedWatchlistTab }) { tab ->
             if (page.selectedWatchlistTab != tab) {
                 page.updateWatchlistEditing(false)
                 page.selectedWatchlistTab = tab
@@ -461,8 +503,8 @@ private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
 }
 
 private fun ViewContainer<*, *>.StockSearchResults(page: StockHomePage) {
-    val results = page.searchResults()
-    vif({ results.isNotEmpty() }) {
+    // 直接使用可观察列表，确保响应式更新
+    vif({ page.observableSearchResults().isNotEmpty() }) {
         View {
             attr {
                 backgroundColor(StockDesignTokens.surface)
@@ -471,17 +513,20 @@ private fun ViewContainer<*, *>.StockSearchResults(page: StockHomePage) {
             }
             View {
                 attr { height(44f); padding(left = 16f, right = 16f); flexDirectionRow(); alignItemsCenter() }
-                Text { attr { text("搜索结果  ${results.size}"); fontSize(14f); fontWeightBold(); color(StockDesignTokens.primaryText); flex(1f) } }
+                Text { attr { text("搜索结果  ${page.observableSearchResults().size}"); fontSize(14f); fontWeightBold(); color(StockDesignTokens.primaryText); flex(1f) } }
                 Text { attr { text("可收藏或进入详情"); fontSize(11f); color(StockDesignTokens.tertiaryText) } }
             }
-            results.forEach { quote ->
-                StockWatchlistQuoteRow(
-                    quote = quote,
-                    width = page.stockContentWidth(),
-                    favorite = { quote.code in page.favoriteCodes },
-                    onFavorite = { page.toggleFavorite(quote.code) },
-                    onClick = { page.openDetail(quote.code) },
-                )
+            // 使用 vfor 遍历可观察列表，自动响应变化
+            vfor({ page.observableSearchResults() }) { quote ->
+                View {
+                    StockWatchlistQuoteRow(
+                        quote = quote,
+                        width = page.stockContentWidth(),
+                        favorite = { quote.code in page.favoriteCodes },
+                        onFavorite = { page.toggleFavorite(quote.code) },
+                        onClick = { page.openDetail(quote.code) },
+                    )
+                }
             }
         }
     }
