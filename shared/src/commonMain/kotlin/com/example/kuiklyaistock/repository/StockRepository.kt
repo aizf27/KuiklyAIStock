@@ -55,6 +55,7 @@ enum class StockRequestType {
 // 股票数据仓库，真实行情和 Mock 实现共用此接口。
 interface StockRepository {
     suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData>
+    suspend fun refreshHome(scope: CoroutineScope): StockLoadResult<StockHomeData>
     suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData>
     suspend fun loadAi(scope: CoroutineScope): StockLoadResult<StockAiData>
 }
@@ -82,6 +83,8 @@ class MockStockRepository(
         if (quotes.isEmpty()) return StockLoadResult.Empty
         return StockLoadResult.Success(StockHomeData(quotes, createMarketSummary(details)))
     }
+
+    override suspend fun refreshHome(scope: CoroutineScope): StockLoadResult<StockHomeData> = loadHome(scope)
 
     override suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData> {
         scope.waitForMockResponse()

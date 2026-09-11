@@ -29,20 +29,17 @@ class TencentStockRepository internal constructor(
     private var latestQuotes: List<StockQuote> = emptyList()
 
     override suspend fun loadHome(scope: CoroutineScope): StockLoadResult<StockHomeData> {
-        // 1. 优先从数据库读取
         val cachedQuotes = databaseRepo.getAllQuotes()
-        if (cachedQuotes.isNotEmpty()) {
-            logger("行情首页：从数据库读取 ${cachedQuotes.size} 只股票")
-            val homeData = buildHomeDataFromCache(cachedQuotes)
-            // 后台刷新网络数据
-            scope.launch { refreshHomeFromNetwork() }
-            return StockLoadResult.Success(homeData)
+        val cachedIndices = databaseRepo.getMarketIndices()
+        if (cachedQuotes.isEmpty() && cachedIndices.isEmpty()) {
+            logger("行情首页：数据库缓存为空")
+            return StockLoadResult.Empty
         }
-
-        // 2. 数据库为空，等待网络请求
-        logger("行情首页：数据库为空，等待网络请求")
-        return refreshHomeFromNetwork()
+        logger("行情首页：读取数据库缓存 股票=${cachedQuotes.size} 指数=${cachedIndices.size}")
+        return StockLoadResult.Success(buildHomeDataFromCache(cachedQuotes, cachedIndices))
     }
+
+    override suspend fun refreshHome(scope: CoroutineScope): StockLoadResult<StockHomeData> = refreshHomeFromNetwork()
 
     override suspend fun loadDetail(scope: CoroutineScope, code: String): StockLoadResult<StockDetailData> {
         val normalized = code.trim()
@@ -88,42 +85,42 @@ class TencentStockRepository internal constructor(
         )
     }
 
-    private fun buildRemoteHome(
+    private suspend fun buildRemoteHome(
         result: DecodedQuotes.Remote,
         stockSymbols: List<String>,
         indexSymbols: List<String>,
     ): StockLoadResult<StockHomeData> {
         val remoteBySymbol = result.quotes.associateBy { it.symbol }
-        val remoteStocks = stockSymbols.mapNotNull(remoteBySymbol::get)
+        val remoteStocks = stockSymbols.mapNotNull(remoteBySymbol::get).map(::toStockQuote)
+        val remoteIndices = indexSymbols.mapNotNull(remoteBySymbol::get).map(::toIndexQuote)
+        if (remoteStocks.isNotEmpty()) databaseRepo.insertQuotes(remoteStocks)
+        if (remoteIndices.isNotEmpty()) databaseRepo.insertMarketIndices(remoteIndices)
+        logger("行情首页：更新数据库 股票=${remoteStocks.size} 指数=${remoteIndices.size}")
         if (remoteStocks.isEmpty()) {
-            return cachedHome(result.missingSymbols, result.completedAt, result.errorMessage)
+            return StockLoadResult.Failure(result.errorMessage ?: "真实行情没有返回个股数据")
         }
-        val stockEntries = stockSymbols.mapNotNull { symbol ->
-            remoteBySymbol[symbol]?.let { StockQuoteEntry(it, false) }
-                ?: TencentQuoteCache.get(symbol)?.let { cached ->
-                    StockQuoteEntry(
-                        cached.quote,
-                        TencentQuoteCache.isExpired(cached, result.completedAt, cacheTtlMillis),
-                    )
-                }
-        }
-        val indices = indexSymbols.mapNotNull { symbol ->
-            remoteBySymbol[symbol] ?: TencentQuoteCache.get(symbol)?.quote
-        }
-        val quotes = stockEntries.map { toStockQuote(it.quote) }
+
+        val cachedStocks = databaseRepo.getAllQuotes().associateBy { it.code }
+        val cachedIndices = databaseRepo.getMarketIndices().associateBy { it.code }
+        val quotes = STOCK_CODES.mapNotNull(cachedStocks::get)
+        val indices = INDEX_CODES.mapNotNull(cachedIndices::get)
         val missingCodes = result.missingSymbols.mapNotNull(TencentSymbolMapper::standardCode)
         if (missingCodes.isNotEmpty()) {
-            logger("行情部分更新 success=${result.quotes.size} missing=${missingCodes.size}")
+            logger("行情首页：部分更新 success=${result.quotes.size} missing=${missingCodes.size}")
         }
         latestQuotes = quotes
         return StockLoadResult.Success(
             StockHomeData(
                 quotes = quotes,
-                marketSummary = createMarketSummary(quotes, indices, stockEntries.sumOf { it.quote.turnover }),
+                marketSummary = createMarketSummary(
+                    quotes = quotes,
+                    indices = indices,
+                    turnover = result.quotes.filter { it.symbol in stockSymbols }.sumOf { it.turnover },
+                ),
                 dataSource = StockDataSource.REMOTE,
-                quoteTime = quotes.map { it.updatedAt }.maxOrNull().orEmpty(),
+                quoteTime = (remoteStocks.map { it.updatedAt } + remoteIndices.map { it.updatedAt }).maxOrNull().orEmpty(),
                 requestCompletedAt = result.completedAt,
-                isExpired = stockEntries.any { it.isExpired },
+                isExpired = false,
                 missingCodes = missingCodes,
             )
         )
@@ -168,55 +165,20 @@ class TencentStockRepository internal constructor(
             }
         }
 
-    private fun cachedHome(
-        missingSymbols: List<String>,
-        completedAt: Long,
-        errorMessage: String?,
-    ): StockLoadResult<StockHomeData> {
-        val cachedStocks = STOCK_CODES.mapNotNull { code ->
-            TencentSymbolMapper.stockSymbol(code)?.let(TencentQuoteCache::get)
-        }
-        if (cachedStocks.isEmpty()) return StockLoadResult.Failure(errorMessage ?: "真实行情加载失败")
-        val cachedIndices = INDEX_CODES.mapNotNull { code ->
-            TencentSymbolMapper.indexSymbol(code)?.let(TencentQuoteCache::get)?.quote
-        }
-        val quotes = cachedStocks.map { toStockQuote(it.quote) }
-        latestQuotes = quotes
-        return StockLoadResult.Success(
-            StockHomeData(
-                quotes = quotes,
-                marketSummary = createMarketSummary(
-                    quotes,
-                    cachedIndices,
-                    cachedStocks.sumOf { it.quote.turnover },
-                ),
-                dataSource = StockDataSource.CACHE,
-                quoteTime = quotes.map { it.updatedAt }.maxOrNull().orEmpty(),
-                requestCompletedAt = completedAt,
-                isExpired = cachedStocks.any { TencentQuoteCache.isExpired(it, completedAt, cacheTtlMillis) },
-                missingCodes = missingSymbols.mapNotNull(TencentSymbolMapper::standardCode),
-            )
-        )
-    }
-
-    private suspend fun buildHomeDataFromCache(quotes: List<StockQuote>): StockHomeData {
-        val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
-        val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
-
+    private fun buildHomeDataFromCache(
+        quotes: List<StockQuote>,
+        indices: List<MarketIndexQuote>,
+    ): StockHomeData {
         val quoteMap = quotes.associateBy { it.code }
-        val stocks = STOCK_CODES.mapNotNull { quoteMap[it] }
-
-        val indices = indexSymbols.mapNotNull { symbol ->
-            TencentQuoteCache.get(symbol)?.quote
-        }
-
+        val indexMap = indices.associateBy { it.code }
+        val stocks = STOCK_CODES.mapNotNull(quoteMap::get)
+        val orderedIndices = INDEX_CODES.mapNotNull(indexMap::get)
         latestQuotes = stocks
-
         return StockHomeData(
             quotes = stocks,
-            marketSummary = createMarketSummary(stocks, indices, 0.0),
+            marketSummary = createMarketSummary(stocks, orderedIndices, 0.0),
             dataSource = StockDataSource.CACHE,
-            quoteTime = stocks.map { it.updatedAt }.maxOrNull().orEmpty(),
+            quoteTime = (stocks.map { it.updatedAt } + orderedIndices.map { it.updatedAt }).maxOrNull().orEmpty(),
             requestCompletedAt = nowMillis(),
             isExpired = false,
             missingCodes = emptyList(),
@@ -226,60 +188,13 @@ class TencentStockRepository internal constructor(
     private suspend fun refreshHomeFromNetwork(): StockLoadResult<StockHomeData> {
         val stockSymbols = STOCK_CODES.mapNotNull(TencentSymbolMapper::stockSymbol)
         val indexSymbols = INDEX_CODES.mapNotNull(TencentSymbolMapper::indexSymbol)
-
-        // 先请求三个指数
-        logger("行情首页：先请求三个指数")
-        val indexResult = fetchAndDecode(indexSymbols)
-
-        // 再请求个股
-        logger("行情首页：再请求个股数据")
-        val stockResult = fetchAndDecode(stockSymbols)
-
-        // 合并结果
-        val allQuotes = mutableListOf<TencentParsedQuote>()
-        val allMissing = mutableListOf<String>()
-        var completedAt = nowMillis()
-        var errorMessage: String? = null
-
-        if (indexResult is DecodedQuotes.Remote) {
-            allQuotes.addAll(indexResult.quotes)
-            allMissing.addAll(indexResult.missingSymbols)
-            completedAt = indexResult.completedAt
-            errorMessage = indexResult.errorMessage
-        } else if (indexResult is DecodedQuotes.Failed) {
-            allMissing.addAll(indexResult.missingSymbols)
-            errorMessage = indexResult.errorMessage
-        }
-
-        if (stockResult is DecodedQuotes.Remote) {
-            allQuotes.addAll(stockResult.quotes)
-            allMissing.addAll(stockResult.missingSymbols)
-            completedAt = stockResult.completedAt
-            if (errorMessage == null) errorMessage = stockResult.errorMessage
-        } else if (stockResult is DecodedQuotes.Failed) {
-            allMissing.addAll(stockResult.missingSymbols)
-            if (errorMessage == null) errorMessage = stockResult.errorMessage
-        }
-
-        return if (allQuotes.isNotEmpty()) {
-            val stockQuotes = allQuotes
-                .filter { it.symbol in stockSymbols }
-                .map { toStockQuote(it) }
-
-            if (stockQuotes.isNotEmpty()) {
-                databaseRepo.insertQuotes(stockQuotes)
-                logger("行情首页：写入数据库 ${stockQuotes.size} 只股票")
-            }
-
-            val result = DecodedQuotes.Remote(allQuotes, allMissing.distinct(), completedAt, errorMessage)
-            buildRemoteHome(result, stockSymbols, indexSymbols)
-        } else {
-            val fallback = databaseRepo.getAllQuotes()
-            if (fallback.isNotEmpty()) {
-                logger("行情首页：网络失败，使用数据库缓存 ${fallback.size} 只")
-                StockLoadResult.Success(buildHomeDataFromCache(fallback))
-            } else {
-                StockLoadResult.Failure(errorMessage ?: "网络请求失败")
+        val symbols = indexSymbols + stockSymbols
+        logger("行情首页：请求最新行情 股票=${stockSymbols.size} 指数=${indexSymbols.size}")
+        return when (val result = fetchAndDecode(symbols)) {
+            is DecodedQuotes.Remote -> buildRemoteHome(result, stockSymbols, indexSymbols)
+            is DecodedQuotes.Failed -> {
+                logger("行情首页：网络刷新失败 ${result.errorMessage}")
+                StockLoadResult.Failure(result.errorMessage ?: "网络请求失败")
             }
         }
     }
@@ -391,7 +306,7 @@ class TencentStockRepository internal constructor(
 
     private fun createMarketSummary(
         quotes: List<StockQuote>,
-        indices: List<TencentParsedQuote>,
+        indices: List<MarketIndexQuote>,
         turnover: Double,
     ): MarketSummary {
         val rising = quotes.count { it.change > 0 }
@@ -404,7 +319,7 @@ class TencentStockRepository internal constructor(
             sessionStatus = "实时快照",
             sampleTurnoverAmount = turnover,
             sampleNetInflowAmount = 0.0,
-            indices = indices.map(::toIndexQuote),
+            indices = indices,
             updatedAt = quotes.map { it.updatedAt }.maxOrNull().orEmpty(),
         )
     }

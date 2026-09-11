@@ -111,7 +111,7 @@ class AiAnalysisRepositoryTest {
 
         cases.forEach { (status, errorType, expected) ->
             val transport = FakeTransport(AiTransportResult.Failure(status, errorType, ""))
-            val result = runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(detail) }
+            val result = runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(detail) }
             assertEquals(expected, assertIs<AiAnalysisLoadResult.Failure>(result).type)
             AiAnalysisMemoryCache.clearForTest()
         }
@@ -123,7 +123,7 @@ class AiAnalysisRepositoryTest {
         val transport = FakeTransport(success(validJson()))
         val realSnapshot = detail.copy(intradayTrend = emptyList(), dailyTrend = emptyList())
 
-        runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(realSnapshot) }
+        runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(realSnapshot) }
 
         val prompt = transport.lastRequest?.userPrompt.orEmpty()
         assertTrue(prompt.contains("行情快照"))
@@ -136,14 +136,14 @@ class AiAnalysisRepositoryTest {
     fun returnsUnsupportedWithoutStartingRequest() {
         val transport = FakeTransport(success(validJson()), supported = false)
 
-        assertIs<AiAnalysisLoadResult.Unsupported>(runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(detail) })
+        assertIs<AiAnalysisLoadResult.Unsupported>(runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(detail) })
         assertEquals(0, transport.callCount)
     }
 
     @Test
     fun usesMemoryCacheAndMarksCacheSource() {
         val transport = FakeTransport(success(validJson()))
-        val repository = RemoteAiAnalysisRepository(transport)
+        val repository = RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository())
 
         val first = assertIs<AiAnalysisLoadResult.Success>(runImmediate { repository.loadAnalysis(detail) }).analysis
         val second = assertIs<AiAnalysisLoadResult.Success>(runImmediate { repository.loadAnalysis(detail) }).analysis
@@ -156,17 +156,17 @@ class AiAnalysisRepositoryTest {
     @Test
     fun isolatesCacheByQuoteTimeModelAndSchemaVersion() {
         val transport = FakeTransport(success(validJson()))
-        runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(detail) }
-        runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(detail.copy(quote = detail.quote.copy(updatedAt = "另一时间"))) }
-        runImmediate { RemoteAiAnalysisRepository(transport, modelName = "other-model").loadAnalysis(detail) }
-        runImmediate { RemoteAiAnalysisRepository(transport, schemaVersion = "v2").loadAnalysis(detail) }
+        runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(detail) }
+        runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(detail.copy(quote = detail.quote.copy(updatedAt = "另一时间"))) }
+        runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository(), modelName = "other-model").loadAnalysis(detail) }
+        runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository(), schemaVersion = "v2").loadAnalysis(detail) }
 
         assertEquals(4, transport.callCount)
     }
 
     private fun load(content: String): AiAnalysisLoadResult {
         val transport = FakeTransport(success(content))
-        return runImmediate { RemoteAiAnalysisRepository(transport).loadAnalysis(detail) }
+        return runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(detail) }
     }
 
     private fun success(content: String) = AiTransportResult.Success(content, "deepseek-flash", "req-1", "2026-09-11 10:00:00")

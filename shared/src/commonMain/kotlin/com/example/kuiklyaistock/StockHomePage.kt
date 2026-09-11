@@ -70,6 +70,7 @@ internal class StockHomePage : BasePager() {
     internal var selectedWatchlistTab by observable(WatchlistTabs.WATCHLIST)
     internal var searchText by observable("")
     private var searchQuoteResults by observableList<StockQuote>()
+    private var favoriteQuoteResults by observableList<StockQuote>()
     internal var currentMinuteOfDay by observable(15 * 60)
     internal var currentClockText by observable("--:--")
     internal var currentDateText by observable("")
@@ -91,6 +92,7 @@ internal class StockHomePage : BasePager() {
         removePortfolioObserver = PortfolioStore.subscribe { state ->
             favoriteCodes = state.favoriteCodes
             positions = state.positions
+            updateFavoriteQuotes() // 更新自选股列表
         }
         refreshMarketClock()
         scheduleMarketClockRefresh()
@@ -229,6 +231,7 @@ internal class StockHomePage : BasePager() {
         marketSummary = data.marketSummary
         quotes = data.quotes
         updateSearchResults()
+        updateFavoriteQuotes() // 更新自选股列表
         dataSource = data.dataSource
         quoteTime = data.quoteTime
         quoteExpired = data.isExpired
@@ -294,6 +297,14 @@ internal class StockHomePage : BasePager() {
         searchQuoteResults.addAll(searchStockQuotes(quotes, searchText))
     }
 
+    // 更新自选股列表
+    private fun updateFavoriteQuotes() {
+        val quotesByCode = quotes.associateBy { it.code }
+        val newFavorites = favoriteCodes.mapNotNull(quotesByCode::get)
+        favoriteQuoteResults.clear()
+        favoriteQuoteResults.addAll(newFavorites)
+    }
+
     internal fun selectMarketCategory(category: String) {
         if (selectedMarketCategory != category) {
             selectedMarketCategory = category
@@ -322,6 +333,9 @@ internal class StockHomePage : BasePager() {
         val quotesByCode = quotes.associateBy { it.code }
         return favoriteCodes.mapNotNull(quotesByCode::get)
     }
+
+    // 返回可观察的自选股列表，用于响应式渲染
+    internal fun observableFavoriteQuotes(): ObservableList<StockQuote> = favoriteQuoteResults
 
     internal fun searchResults(): List<StockQuote> = filteredMarketQuotes()
 
@@ -487,17 +501,20 @@ private fun ViewContainer<*, *>.StockWatchlistQuoteList(page: StockHomePage) {
         }
         StockWatchlistQuoteHeader(page.stockContentWidth())
         View { attr { height(1f); backgroundColor(StockDesignTokens.divider); marginLeft(16f) } }
-        page.favoriteQuotes().forEach { quote ->
-            StockWatchlistQuoteRow(
-                quote = quote,
-                width = page.stockContentWidth(),
-                favorite = { quote.code in page.favoriteCodes },
-                onFavorite = { page.toggleFavorite(quote.code) },
-                editing = { page.watchlistEditing },
-                onRemove = { page.removeFavorite(quote.code) },
-                onDrag = { state, y -> page.dragFavorite(quote.code, state, y) },
-                onClick = { if (!page.watchlistEditing) page.openDetail(quote.code) },
-            )
+        // 使用 vfor 遍历可观察列表，拖动排序时自动响应变化
+        vfor({ page.observableFavoriteQuotes() }) { quote ->
+            View {
+                StockWatchlistQuoteRow(
+                    quote = quote,
+                    width = page.stockContentWidth(),
+                    favorite = { quote.code in page.favoriteCodes },
+                    onFavorite = { page.toggleFavorite(quote.code) },
+                    editing = { page.watchlistEditing },
+                    onRemove = { page.removeFavorite(quote.code) },
+                    onDrag = { state, y -> page.dragFavorite(quote.code, state, y) },
+                    onClick = { if (!page.watchlistEditing) page.openDetail(quote.code) },
+                )
+            }
         }
     }
 }

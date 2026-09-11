@@ -1,6 +1,8 @@
 package com.example.kuiklyaistock.repository
 
+import com.example.kuiklyaistock.model.MarketIndexQuote
 import com.example.kuiklyaistock.model.StockDataSource
+import com.example.kuiklyaistock.model.StockQuote
 import com.tencent.kuikly.core.coroutines.CoroutineScope
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
@@ -27,7 +29,68 @@ class TencentStockRepositoryTest {
     }
 
     @Test
-    fun loadsRemoteDetailWithoutFakeTrends() {
+    fun loadsHomeCacheWithoutNetworkRequest() {
+        val database = FakeStockDatabaseRepository()
+        runImmediate {
+            database.insertQuotes(listOf(stockQuote()))
+            database.insertMarketIndices(marketIndices())
+        }
+        val transport = FakeQuoteTransport(mutableListOf(failure()))
+        val repository = repository(transport, database)
+
+        val data = assertSuccess(runImmediate { repository.loadHome(testScope) })
+
+        assertEquals(0, transport.callCount)
+        assertEquals(StockDataSource.CACHE, data.dataSource)
+        assertEquals(listOf("600519"), data.quotes.map { it.code })
+        assertEquals(listOf("000001", "399001", "399006"), data.marketSummary.indices.map { it.code })
+    }
+
+    @Test
+    fun refreshPersistsStocksAndIndices() {
+        val database = FakeStockDatabaseRepository()
+        val repository = repository(success(homeResponse()), database)
+
+        val data = assertSuccess(runImmediate { repository.refreshHome(testScope) })
+
+        assertEquals(StockDataSource.REMOTE, data.dataSource)
+        assertEquals(listOf("600519"), runImmediate { database.getAllQuotes() }.map { it.code })
+        assertEquals(listOf("000001", "399001", "399006"), runImmediate { database.getMarketIndices() }.map { it.code })
+        assertTrue(runImmediate { database.getAllQuotes() }.none { it.code.startsWith("IDX:") })
+    }
+
+    @Test
+    fun restoresIndicesFromDatabaseAfterMemoryCacheIsCleared() {
+        val database = FakeStockDatabaseRepository()
+        assertSuccess(runImmediate { repository(success(homeResponse()), database).refreshHome(testScope) })
+        TencentQuoteCache.clear()
+
+        val restored = assertSuccess(runImmediate { repository(failure(), database).loadHome(testScope) })
+
+        assertEquals(StockDataSource.CACHE, restored.dataSource)
+        assertEquals(3, restored.marketSummary.indices.size)
+        assertEquals("000001", restored.marketSummary.indices.first().code)
+    }
+
+    @Test
+    fun keepsDatabaseCacheWhenRefreshFails() {
+        val database = FakeStockDatabaseRepository()
+        runImmediate {
+            database.insertQuotes(listOf(stockQuote()))
+            database.insertMarketIndices(marketIndices())
+        }
+        val repository = repository(failure(QuoteTransportErrorCategory.TIMEOUT), database)
+
+        val refresh = runImmediate { repository.refreshHome(testScope) }
+        val cached = assertSuccess(runImmediate { repository.loadHome(testScope) })
+
+        assertEquals("行情请求超时", assertIs<StockLoadResult.Failure>(refresh).message)
+        assertEquals(1_568.20, cached.quotes.single().price)
+        assertEquals(3, cached.marketSummary.indices.size)
+    }
+
+    @Test
+    fun loadsRemoteDetailAndPersistsGeneratedTrends() {
         val repository = repository(success(record("sh600519")))
 
         val data = assertSuccess(runImmediate { repository.loadDetail(testScope, "600519") })
@@ -36,38 +99,16 @@ class TencentStockRepositoryTest {
         assertEquals("2026-09-11 10:30:45", data.quoteTime)
         assertEquals(1_234_500L, data.detail.volume)
         assertEquals(193_525_000.0, data.detail.turnover)
-        assertTrue(data.detail.intradayTrend.isEmpty())
-        assertTrue(data.detail.dailyTrend.isEmpty())
+        assertTrue(data.detail.intradayTrend.isNotEmpty())
+        assertTrue(data.detail.dailyKLine.isNotEmpty())
     }
 
     @Test
-    fun fallsBackToFreshAndExpiredCache() {
-        val transport = FakeQuoteTransport(mutableListOf(success(record("sh600519"))))
-        val repository = repository(transport)
-        assertSuccess(runImmediate { repository.loadDetail(testScope, "600519") })
+    fun sharesMemoryCacheBetweenHomeAndDetailRepositories() {
+        val home = assertSuccess(runImmediate { repository(success(homeResponse())).refreshHome(testScope) })
 
-        now = 2_000L
-        transport.results += failure()
-        val fresh = assertSuccess(runImmediate { repository.loadDetail(testScope, "600519") })
-        assertEquals(StockDataSource.CACHE, fresh.dataSource)
-        assertEquals(false, fresh.isExpired)
+        val detail = assertSuccess(runImmediate { repository(failure()).loadDetail(testScope, "600519") })
 
-        now = 130_002L
-        transport.results += failure()
-        val expired = assertSuccess(runImmediate { repository.loadDetail(testScope, "600519") })
-        assertEquals(StockDataSource.CACHE, expired.dataSource)
-        assertEquals(true, expired.isExpired)
-    }
-
-    @Test
-    fun sharesCacheBetweenHomeAndDetailRepositories() {
-        val homeRepository = repository(success(record("sh600519")))
-        val home = assertSuccess(runImmediate { homeRepository.loadHome(testScope) })
-        assertEquals(StockDataSource.REMOTE, home.dataSource)
-        assertTrue(home.missingCodes.isNotEmpty())
-
-        val detailRepository = repository(failure())
-        val detail = assertSuccess(runImmediate { detailRepository.loadDetail(testScope, "600519") })
         assertEquals(StockDataSource.CACHE, detail.dataSource)
         assertEquals(home.quotes.single().price, detail.detail.quote.price)
     }
@@ -78,32 +119,11 @@ class TencentStockRepositoryTest {
             record("sh600519"),
             record("sz300750", price = "220.50", high = "225.00", low = "210.00"),
         ).joinToString("\n")
-        val repository = repository(success(response))
-
-        val home = assertSuccess(runImmediate { repository.loadHome(testScope) })
+        val home = assertSuccess(runImmediate { repository(success(response)).refreshHome(testScope) })
 
         assertEquals(StockDataSource.REMOTE, home.dataSource)
         assertEquals(setOf("600519", "300750"), home.quotes.map { it.code }.toSet())
         assertTrue(home.missingCodes.contains("603019"))
-    }
-
-    @Test
-    fun marksPartialRemoteHomeExpiredWhenMergedCacheIsExpired() {
-        val transport = FakeQuoteTransport(
-            mutableListOf(
-                success(record("sh600519")),
-                success(record("sz300750", price = "220.50", high = "225.00", low = "210.00")),
-            )
-        )
-        val repository = repository(transport)
-        assertSuccess(runImmediate { repository.loadHome(testScope) })
-
-        now = 130_002L
-        val home = assertSuccess(runImmediate { repository.loadHome(testScope) })
-
-        assertEquals(StockDataSource.REMOTE, home.dataSource)
-        assertEquals(setOf("600519", "300750"), home.quotes.map { it.code }.toSet())
-        assertTrue(home.isExpired)
     }
 
     @Test
@@ -134,13 +154,35 @@ class TencentStockRepositoryTest {
         assertEquals("行情请求超时", assertIs<StockLoadResult.Failure>(result).message)
     }
 
-    private fun repository(result: QuoteTransportResult) = repository(FakeQuoteTransport(mutableListOf(result)))
+    private fun repository(
+        result: QuoteTransportResult,
+        database: StockDatabaseRepository = FakeStockDatabaseRepository(),
+    ) = repository(FakeQuoteTransport(mutableListOf(result)), database)
 
-    private fun repository(transport: QuoteTransport) = TencentStockRepository(
+    private fun repository(
+        transport: QuoteTransport,
+        database: StockDatabaseRepository = FakeStockDatabaseRepository(),
+    ) = TencentStockRepository(
         transport = transport,
         nowMillis = { now },
         logger = {},
+        databaseRepo = database,
         cacheTtlMillis = 120_000L,
+    )
+
+    private fun homeResponse(): String = listOf(
+        record("sh600519"),
+        record("sh000001", name = "上证指数", price = "3951.51", previousClose = "3940.55", open = "3945.00", change = "10.96", percent = "0.28", high = "3960.00", low = "3930.00"),
+        record("sz399001", name = "深证成指", price = "13723.32", previousClose = "13703.21", open = "13710.00", change = "20.11", percent = "0.15", high = "13750.00", low = "13680.00"),
+        record("sz399006", name = "创业板指", price = "3354.97", previousClose = "3359.72", open = "3360.00", change = "-4.75", percent = "-0.14", high = "3370.00", low = "3340.00"),
+    ).joinToString("\n")
+
+    private fun stockQuote() = StockQuote("贵州茅台", "600519", 1_568.20, -13.60, -0.86, "2026-09-11 10:30:45")
+
+    private fun marketIndices() = listOf(
+        MarketIndexQuote("上证指数", "000001", 3_951.51, 10.96, 0.28, "2026-09-11 10:30:45"),
+        MarketIndexQuote("深证成指", "399001", 13_723.32, 20.11, 0.15, "2026-09-11 10:30:45"),
+        MarketIndexQuote("创业板指", "399006", 3_354.97, -4.75, -0.14, "2026-09-11 10:30:45"),
     )
 
     private fun success(body: String) = QuoteTransportResult.Success(body.encodeToByteArray(), 200)
@@ -195,7 +237,12 @@ class TencentStockRepositoryTest {
     private class FakeQuoteTransport(
         val results: MutableList<QuoteTransportResult>,
     ) : QuoteTransport {
-        override suspend fun fetch(symbols: List<String>): QuoteTransportResult = results.removeAt(0)
+        var callCount = 0
+
+        override suspend fun fetch(symbols: List<String>): QuoteTransportResult {
+            callCount++
+            return results.removeAt(0)
+        }
     }
 
     private companion object {

@@ -18,7 +18,11 @@ CREATE TABLE StockQuote (
 
 -- 查询所有股票
 getAllQuotes:
-SELECT * FROM StockQuote;
+SELECT * FROM StockQuote WHERE code NOT LIKE 'IDX:%';
+
+-- 查询三大指数缓存
+getAllIndexQuotes:
+SELECT * FROM StockQuote WHERE code LIKE 'IDX:%';
 
 -- 根据 code 查询单只股票
 getQuoteByCode:

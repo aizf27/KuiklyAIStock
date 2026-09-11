@@ -1,6 +1,7 @@
 package com.example.kuiklyaistock.repository
 
 import com.example.kuiklyaistock.model.AiAnalysis
+import com.example.kuiklyaistock.model.MarketIndexQuote
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.TrendPoint
 import com.tencent.kuiklybase.chart.model.OhlcPoint
@@ -15,6 +16,12 @@ interface StockDatabaseRepository {
 
     // 插入或更新股票快照（批量）
     suspend fun insertQuotes(quotes: List<StockQuote>)
+
+    // 查询三大指数缓存
+    suspend fun getMarketIndices(): List<MarketIndexQuote>
+
+    // 插入或更新三大指数缓存
+    suspend fun insertMarketIndices(indices: List<MarketIndexQuote>)
 
     // 查询分时数据
     suspend fun getIntradayTrend(code: String): List<TrendPoint>

@@ -3,6 +3,7 @@ package com.example.kuiklyaistock.repository
 import com.example.kuiklyaistock.db.StockDatabase
 import com.example.kuiklyaistock.model.AiAnalysis
 import com.example.kuiklyaistock.model.AiAnalysisSource
+import com.example.kuiklyaistock.model.MarketIndexQuote
 import com.example.kuiklyaistock.model.StockQuote
 import com.example.kuiklyaistock.model.TrendPoint
 import com.tencent.kuiklybase.chart.model.OhlcPoint
@@ -51,6 +52,43 @@ internal class SqlDelightStockDatabaseRepository(
                     peRatio = null,
                     updatedAt = quote.updatedAt,
                     cachedAt = nowMillis()
+                )
+            }
+        }
+    }
+
+    override suspend fun getMarketIndices(): List<MarketIndexQuote> = withContext(Dispatchers.Default) {
+        stockQuoteQueries.getAllIndexQuotes().executeAsList().map { record ->
+            MarketIndexQuote(
+                name = record.name,
+                code = record.code.removePrefix(INDEX_CODE_PREFIX),
+                price = record.price,
+                change = record.change,
+                changePercent = record.changePercent,
+                updatedAt = record.updatedAt,
+            )
+        }
+    }
+
+    override suspend fun insertMarketIndices(indices: List<MarketIndexQuote>) = withContext(Dispatchers.Default) {
+        database.transaction {
+            indices.forEach { index ->
+                stockQuoteQueries.insertOrReplaceQuote(
+                    code = INDEX_CODE_PREFIX + index.code,
+                    name = index.name,
+                    price = index.price,
+                    change = index.change,
+                    changePercent = index.changePercent,
+                    open_ = 0.0,
+                    previousClose = 0.0,
+                    high = 0.0,
+                    low = 0.0,
+                    volume = 0,
+                    turnover = 0.0,
+                    turnoverRate = null,
+                    peRatio = null,
+                    updatedAt = index.updatedAt,
+                    cachedAt = nowMillis(),
                 )
             }
         }
@@ -146,4 +184,9 @@ internal class SqlDelightStockDatabaseRepository(
         changePercent = changePercent,
         updatedAt = updatedAt,
     )
+
+    private companion object {
+        const val INDEX_CODE_PREFIX = "IDX:"
+    }
+
 }
