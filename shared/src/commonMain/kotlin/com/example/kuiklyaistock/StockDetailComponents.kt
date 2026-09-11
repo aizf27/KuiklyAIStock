@@ -2,6 +2,8 @@ package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.model.StockDetail
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.directives.velse
+import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.collection.ObservableList
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
@@ -18,6 +20,7 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
     width: Float,
     isFavorite: () -> Boolean = { false },
     onFavorite: () -> Unit = {},
+    sourceLabel: String = "",
 ) {
     View {
         attr {
@@ -53,6 +56,16 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
                         color(StockDesignTokens.tertiaryText)
                     }
                 }
+                if (sourceLabel.isNotEmpty()) {
+                    Text {
+                        attr {
+                            text(sourceLabel)
+                            fontSize(11f)
+                            color(StockDesignTokens.secondaryText)
+                            marginLeft(8f)
+                        }
+                    }
+                }
             }
             // 关注按钮
             View {
@@ -68,7 +81,7 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
                         fontSize(12f)
                         color(if (isFavorite()) StockDesignTokens.brand else StockDesignTokens.surface)
                     }
-                }
+                    }
             }
         }
 
@@ -128,8 +141,8 @@ internal fun ViewContainer<*, *>.StockDetailHeader(
             }
             StockDetailMetricItem("成交量", formatStockVolume(detail.volume))
             StockDetailMetricItem("成交额", formatStockTurnover(detail.turnover))
-            StockDetailMetricItem("换手率", "0.42%") // TODO: 从detail获取
-            StockDetailMetricItem("市盈率", "5.23") // TODO: 从detail获取
+            StockDetailMetricItem("换手率", "--")
+            StockDetailMetricItem("市盈率", "--")
         }
     }
 }
@@ -199,32 +212,45 @@ internal fun ViewContainer<*, *>.StockChartSection(
                 backgroundColor(StockDesignTokens.surface)
                 borderRadius(8f)
             }
-            StockChart(candles) {
-                attr {
-                    flex(1f)
-                    preset = StockThemePreset.LIGHT
-                    priceDisplayMode = if (selectedPeriod() == StockChartPeriod.INTRADAY) {
-                        StockPriceDisplayMode.LINE
-                    } else {
-                        StockPriceDisplayMode.CANDLE
+            vif({ candles().isEmpty() }) {
+                Text {
+                    attr {
+                        text("暂无真实走势数据")
+                        fontSize(14f)
+                        color(StockDesignTokens.tertiaryText)
+                        flex(1f)
+                        alignSelfCenter()
                     }
-                    mainIndicator = if (selectedPeriod() == StockChartPeriod.INTRADAY) {
-                        StockMainIndicator.BARE_K
-                    } else {
-                        StockMainIndicator.MA
-                    }
-                    firstPane {
-                        show = selectedPeriod() != StockChartPeriod.INTRADAY
-                        indicator = StockAuxiliaryIndicator.VOLUME
-                        heightRatio = 0.24f
-                    }
-                    secondPane { show = false }
-                    interaction {
-                        enableCrosshair = true
-                        enableLongPressInspect = true
-                        enableScale = true
-                        enablePan = true
-                        enableReset = true
+                }
+            }
+            velse {
+                StockChart(candles) {
+                    attr {
+                        flex(1f)
+                        preset = StockThemePreset.LIGHT
+                        priceDisplayMode = if (selectedPeriod() == StockChartPeriod.INTRADAY) {
+                            StockPriceDisplayMode.LINE
+                        } else {
+                            StockPriceDisplayMode.CANDLE
+                        }
+                        mainIndicator = if (selectedPeriod() == StockChartPeriod.INTRADAY) {
+                            StockMainIndicator.BARE_K
+                        } else {
+                            StockMainIndicator.MA
+                        }
+                        firstPane {
+                            show = selectedPeriod() != StockChartPeriod.INTRADAY
+                            indicator = StockAuxiliaryIndicator.VOLUME
+                            heightRatio = 0.24f
+                        }
+                        secondPane { show = false }
+                        interaction {
+                            enableCrosshair = true
+                            enableLongPressInspect = true
+                            enableScale = true
+                            enablePan = true
+                            enableReset = true
+                        }
                     }
                 }
             }

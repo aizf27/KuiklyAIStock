@@ -2,14 +2,17 @@ package com.example.kuiklyaistock
 
 import com.example.kuiklyaistock.base.BasePager
 import com.example.kuiklyaistock.base.BridgeModule
+import com.example.kuiklyaistock.base.setTimeout
 import com.example.kuiklyaistock.model.AiAnalysis
 import com.example.kuiklyaistock.model.StockDetail
+import com.example.kuiklyaistock.model.StockDataSource
+import com.example.kuiklyaistock.model.displayName
 import com.example.kuiklyaistock.model.StockPosition
 import com.example.kuiklyaistock.model.TradeResult
 import com.example.kuiklyaistock.repository.AiAnalysisLoadResult
 import com.example.kuiklyaistock.repository.AiAnalysisRepository
 import com.example.kuiklyaistock.repository.BridgeAiAnalysisTransport
-import com.example.kuiklyaistock.repository.MockStockRepository
+import com.example.kuiklyaistock.repository.TencentStockRepository
 import com.example.kuiklyaistock.repository.RemoteAiAnalysisRepository
 import com.example.kuiklyaistock.repository.PortfolioPersistence
 import com.example.kuiklyaistock.repository.PortfolioStore
@@ -32,7 +35,13 @@ import com.tencent.kuiklybase.chart.model.OhlcPoint
 
 @Page("stock_detail", supportInLocal = true)
 internal class StockDetailPage : BasePager() {
-    private val repository: StockRepository = MockStockRepository()
+    private val repository: StockRepository by lazy {
+        TencentStockRepository(
+            pager = this,
+            nowMillis = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).currentTimeStamp() },
+            logger = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(it) },
+        )
+    }
     private var loading by observable(true)
     private var detail by observable<StockDetail?>(null)
     private var displayedAnalysis by observable<AiAnalysis?>(null)
@@ -40,6 +49,9 @@ internal class StockDetailPage : BasePager() {
     private var aiErrorMessage by observable("")
     private var isAiDetailExpanded by observable(false)
     private var errorMessage by observable("")
+    private var dataSource by observable(StockDataSource.REMOTE)
+    private var quoteTime by observable("")
+    private var quoteExpired by observable(false)
     private var favoriteCodes by observable(emptyList<String>())
     private var positions by observable(emptyList<StockPosition>())
     private var tradeSide by observable("")
@@ -53,20 +65,26 @@ internal class StockDetailPage : BasePager() {
     private val detailRequests = StockRequestTracker()
     private val aiRequests = StockRequestTracker()
     private var aiRepository: AiAnalysisRepository? = null
+    private var quoteRefreshActive = false
+    private var detailLoading = false
+    private var analyzedQuoteTime = ""
 
     override fun created() {
         super.created()
         val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
         PortfolioPersistence.ensureLoaded(bridge)
+        quoteRefreshActive = true
         aiRepository = RemoteAiAnalysisRepository(BridgeAiAnalysisTransport(bridge))
         removePortfolioObserver = PortfolioStore.subscribe { state ->
             favoriteCodes = state.favoriteCodes
             positions = state.positions
         }
         loadDetail()
+        scheduleQuoteRefresh()
     }
 
     override fun onDestroyPager() {
+        quoteRefreshActive = false
         detailRequests.invalidate()
         aiRequests.invalidate()
         removePortfolioObserver?.invoke()
@@ -106,7 +124,8 @@ internal class StockDetailPage : BasePager() {
                                 detail = stock,
                                 width = ctx.stockContentWidth(),
                                 isFavorite = { ctx.isFavorite(stock.quote.code) },
-                                onFavorite = { ctx.toggleFavorite(stock.quote.code) }
+                                onFavorite = { ctx.toggleFavorite(stock.quote.code) },
+                                sourceLabel = "${ctx.dataSource.displayName()} · ${ctx.quoteTime.ifEmpty { stock.quote.updatedAt }}${if (ctx.quoteExpired) " · 已过期" else ""}"
                             )
 
                             // 使用新的K线图区组件
@@ -160,6 +179,8 @@ internal class StockDetailPage : BasePager() {
     }
 
     private fun loadDetail() {
+        if (detailLoading) return
+        detailLoading = true
         val code = pagerData.params.optString("code").trim()
         if (code.isEmpty()) {
             resetAiInteractionState()
@@ -167,42 +188,68 @@ internal class StockDetailPage : BasePager() {
             aiLoadState = AiLoadState.IDLE
             aiErrorMessage = ""
             loading = false
+            detailLoading = false
             errorMessage = "缺少股票代码，无法加载详情"
             acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 缺少股票代码")
             return
         }
+        val switchingStock = detail?.quote?.code != code
         val requestId = detailRequests.next()
-        aiRequests.invalidate()
-        resetAiInteractionState()
-        displayedAnalysis = null
-        aiLoadState = AiLoadState.IDLE
-        aiErrorMessage = ""
+        if (switchingStock) {
+            aiRequests.invalidate()
+            resetAiInteractionState()
+            displayedAnalysis = null
+            aiLoadState = AiLoadState.IDLE
+            aiErrorMessage = ""
+            analyzedQuoteTime = ""
+        }
         loading = true
         errorMessage = ""
         acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 开始加载: $code")
         lifecycleScope.launch {
             when (val result = repository.loadDetail(this, code)) {
                 is StockLoadResult.Success -> {
-                    if (!acceptResult(requestId, code)) return@launch
-                    displayedAnalysis = result.data.analysis
+                    if (!acceptResult(requestId, code)) {
+                        detailLoading = false
+                        return@launch
+                    }
+                    result.data.analysis?.let { displayedAnalysis = it }
                     detail = result.data.detail
+                    dataSource = result.data.dataSource
+                    quoteTime = result.data.quoteTime
+                    quoteExpired = result.data.isExpired
                     refreshChartData(result.data.detail)
-                    loadRemoteAnalysis(result.data.detail)
+                    if (
+                        result.data.dataSource != StockDataSource.MOCK &&
+                        !result.data.isExpired &&
+                        displayedAnalysis == null &&
+                        analyzedQuoteTime != result.data.quoteTime
+                    ) {
+                        analyzedQuoteTime = result.data.quoteTime
+                        loadRemoteAnalysis(result.data.detail)
+                    }
                     errorMessage = ""
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载成功: $code")
                 }
                 StockLoadResult.Empty -> {
-                    if (!acceptResult(requestId, code)) return@launch
+                    if (!acceptResult(requestId, code)) {
+                        detailLoading = false
+                        return@launch
+                    }
                     errorMessage = "未找到股票：$code"
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 未找到股票: $code")
                 }
                 is StockLoadResult.Failure -> {
-                    if (!acceptResult(requestId, code)) return@launch
+                    if (!acceptResult(requestId, code)) {
+                        detailLoading = false
+                        return@launch
+                    }
                     errorMessage = result.message
                     acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log("stock_detail 加载失败: $code, ${result.message}")
                 }
             }
             loading = false
+            detailLoading = false
         }
     }
 
@@ -214,6 +261,15 @@ internal class StockDetailPage : BasePager() {
         return false
     }
 
+    private fun scheduleQuoteRefresh() {
+        setTimeout(15_000) {
+            if (quoteRefreshActive) {
+                loadDetail()
+                scheduleQuoteRefresh()
+            }
+        }
+    }
+
     private fun selectChartPeriod(period: StockChartPeriod) {
         if (selectedChartPeriod == period) return
         selectedChartPeriod = period
@@ -223,7 +279,10 @@ internal class StockDetailPage : BasePager() {
 
     private fun refreshChartData(stock: StockDetail) {
         chartCandles.clear()
-        chartCandles.addAll(mockStockCandles(stock, selectedChartPeriod))
+        if (dataSource == StockDataSource.MOCK) {
+            chartCandles.addAll(mockStockCandles(stock, selectedChartPeriod))
+        }
+        // 真实行情暂未提供时序接口，保持空图表，不生成伪造 K 线。
     }
 
     private fun resetAiInteractionState() {
@@ -274,8 +333,10 @@ internal class StockDetailPage : BasePager() {
     }
 
     private fun retryAiAnalysis() {
+        if (dataSource == StockDataSource.MOCK || quoteExpired) return
         detail?.let {
             resetAiInteractionState()
+            analyzedQuoteTime = quoteTime
             loadRemoteAnalysis(it)
         }
     }
@@ -404,7 +465,7 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockDetailIdentity
             }
             Text {
                 attr {
-                    text("${stock.quote.code} · ${stock.quote.updatedAt} · 演示数据")
+                    text("${stock.quote.code} · ${stock.quote.updatedAt} · 行情快照")
                     fontSize(12f)
                     color(StockDesignTokens.secondaryText)
                     marginTop(4f)
@@ -462,7 +523,7 @@ private fun com.tencent.kuikly.core.base.ViewContainer<*, *>.StockPricePanel(sto
         }
         Text {
             attr {
-                text("${stock.quote.updatedAt} · 演示数据")
+                text("${stock.quote.updatedAt} · 行情快照")
                 fontSize(11f)
                 color(StockDesignTokens.tertiaryText)
                 marginTop(6f)
