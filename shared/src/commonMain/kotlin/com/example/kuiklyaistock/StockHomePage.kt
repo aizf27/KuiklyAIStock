@@ -17,6 +17,8 @@ import com.example.kuiklyaistock.repository.StockLoadResult
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockRequestTracker
 import com.example.kuiklyaistock.repository.searchStockQuotes
+import com.example.kuiklyaistock.repository.DatabaseFactory
+import com.example.kuiklyaistock.repository.SqlDelightStockDatabaseRepository
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
@@ -34,10 +36,15 @@ import com.tencent.kuikly.core.views.View
 @Page("stock_home", supportInLocal = true)
 internal class StockHomePage : BasePager() {
     private val repository: StockRepository by lazy {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val databaseRepo = SqlDelightStockDatabaseRepository(
+            DatabaseFactory.getDatabaseFromPager(this)
+        )
         TencentStockRepository(
             pager = this,
-            nowMillis = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).currentTimeStamp() },
-            logger = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(it) },
+            nowMillis = { bridge.currentTimeStamp() },
+            logger = { bridge.log(it) },
+            databaseRepo = databaseRepo,
         )
     }
     private var loading by observable(true)
@@ -219,7 +226,7 @@ internal class StockHomePage : BasePager() {
     }
 
     private fun scheduleQuoteRefresh() {
-        setTimeout(30_000) {
+        setTimeout(60_000) {
             if (quoteRefreshActive) {
                 if (selectedTab == StockTabs.MARKET) loadContent()
                 scheduleQuoteRefresh()

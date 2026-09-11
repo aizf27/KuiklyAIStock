@@ -6,7 +6,7 @@ import com.example.kuiklyaistock.model.TrendPoint
 import com.tencent.kuiklybase.chart.model.OhlcPoint
 
 // 数据库仓储接口，隔离 SQLDelight 实现细节
-internal interface StockDatabaseRepository {
+interface StockDatabaseRepository {
     // 查询单只股票快照
     suspend fun getQuote(code: String): StockQuote?
 
@@ -36,7 +36,7 @@ internal interface StockDatabaseRepository {
 }
 
 // AI 分析缓存条目
-internal data class AiAnalysisCacheEntry(
+data class AiAnalysisCacheEntry(
     val analysis: AiAnalysis,
     val quoteTime: String,
     val analyzedAt: Long,

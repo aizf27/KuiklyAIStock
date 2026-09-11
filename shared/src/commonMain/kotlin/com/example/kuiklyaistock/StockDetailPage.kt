@@ -19,6 +19,8 @@ import com.example.kuiklyaistock.repository.PortfolioStore
 import com.example.kuiklyaistock.repository.StockRepository
 import com.example.kuiklyaistock.repository.StockLoadResult
 import com.example.kuiklyaistock.repository.StockRequestTracker
+import com.example.kuiklyaistock.repository.DatabaseFactory
+import com.example.kuiklyaistock.repository.SqlDelightStockDatabaseRepository
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.coroutines.launch
@@ -36,10 +38,15 @@ import com.tencent.kuiklybase.chart.model.OhlcPoint
 @Page("stock_detail", supportInLocal = true)
 internal class StockDetailPage : BasePager() {
     private val repository: StockRepository by lazy {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val databaseRepo = SqlDelightStockDatabaseRepository(
+            DatabaseFactory.getDatabaseFromPager(this)
+        )
         TencentStockRepository(
             pager = this,
-            nowMillis = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).currentTimeStamp() },
-            logger = { acquireModule<BridgeModule>(BridgeModule.MODULE_NAME).log(it) },
+            nowMillis = { bridge.currentTimeStamp() },
+            logger = { bridge.log(it) },
+            databaseRepo = databaseRepo,
         )
     }
     private var loading by observable(true)
@@ -74,7 +81,13 @@ internal class StockDetailPage : BasePager() {
         val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
         PortfolioPersistence.ensureLoaded(bridge)
         quoteRefreshActive = true
-        aiRepository = RemoteAiAnalysisRepository(BridgeAiAnalysisTransport(bridge))
+        val databaseRepo = SqlDelightStockDatabaseRepository(
+            DatabaseFactory.getDatabaseFromPager(this)
+        )
+        aiRepository = RemoteAiAnalysisRepository(
+            BridgeAiAnalysisTransport(bridge),
+            databaseRepo = databaseRepo
+        )
         removePortfolioObserver = PortfolioStore.subscribe { state ->
             favoriteCodes = state.favoriteCodes
             positions = state.positions
@@ -262,7 +275,7 @@ internal class StockDetailPage : BasePager() {
     }
 
     private fun scheduleQuoteRefresh() {
-        setTimeout(15_000) {
+        setTimeout(60_000) {
             if (quoteRefreshActive) {
                 loadDetail()
                 scheduleQuoteRefresh()

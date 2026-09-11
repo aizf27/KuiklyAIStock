@@ -9,6 +9,7 @@ import com.example.kuiklyaistock.model.StockDataSource
 import com.example.kuiklyaistock.model.StockDetail
 import com.example.kuiklyaistock.model.StockQuote
 import com.tencent.kuikly.core.coroutines.CoroutineScope
+import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.pager.Pager
 
 class TencentStockRepository internal constructor(
