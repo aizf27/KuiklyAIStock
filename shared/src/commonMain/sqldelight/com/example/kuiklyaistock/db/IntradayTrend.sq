@@ -1,0 +1,26 @@
+CREATE TABLE IntradayTrend (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  time TEXT NOT NULL,
+  price REAL NOT NULL,
+  volume REAL NOT NULL,
+  FOREIGN KEY(code) REFERENCES StockQuote(code) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_intraday_code ON IntradayTrend(code);
+
+-- 查询某只股票的分时数据
+getIntradayTrend:
+SELECT time, price, volume FROM IntradayTrend WHERE code = ? ORDER BY time ASC;
+
+-- 插入分时数据
+insertIntradayPoint:
+INSERT INTO IntradayTrend (code, time, price, volume) VALUES (?, ?, ?, ?);
+
+-- 删除某只股票的分时数据
+deleteByCode:
+DELETE FROM IntradayTrend WHERE code = ?;
+
+-- 删除所有分时数据（测试用）
+deleteAll:
+DELETE FROM IntradayTrend;

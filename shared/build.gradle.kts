@@ -8,6 +8,7 @@ plugins {
     id("maven-publish")
     id("com.tencent.kuikly-open.kuikly")
     id("app.cash.sqldelight") version "2.0.1"
+    kotlin("plugin.serialization") version "1.9.20"
 
 }
 
@@ -63,6 +64,7 @@ kotlin {
                 implementation("com.tencent.kuikly-open:core-annotations:${Version.getKuiklyVersion()}")
                 implementation(project(":KuiklyChart"))
                 implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
             }
         }

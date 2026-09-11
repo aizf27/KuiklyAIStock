@@ -1,5 +1,8 @@
 package com.example.kuiklyaistock.model
 
+import com.tencent.kuiklybase.chart.model.OhlcPoint
+import kotlinx.serialization.Serializable
+
 // 行情数据来源。
 enum class StockDataSource {
     REMOTE,
@@ -60,17 +63,25 @@ data class StockDetail(
     val low: Double,
     val volume: Long,
     val turnover: Double,
+    val turnoverRate: Double? = null,     // 新增：换手率
+    val peRatio: Double? = null,          // 新增：市盈率
     val intradayTrend: List<TrendPoint>,
-    val dailyTrend: List<TrendPoint>,
+    val fiveDayTrend: List<TrendPoint> = emptyList(),    // 新增：五日走势
+    val dailyKLine: List<OhlcPoint> = emptyList(),       // 新增：日 K
+    val weeklyKLine: List<OhlcPoint> = emptyList(),      // 新增：周 K
+    val monthlyKLine: List<OhlcPoint> = emptyList(),     // 新增：月 K
+    val dailyTrend: List<TrendPoint> = emptyList(),      // 标记为废弃
 )
 
 // 简化的走势数据点，供跨端走势组件渲染。
 data class TrendPoint(
     val label: String,
     val price: Double,
+    val volume: Double = 0.0,  // 新增：成交量
 )
 
 // AI 分析的趋势方向。
+@Serializable
 enum class AiTrendType(val label: String) {
     STRONG("偏强"),
     SIDEWAYS("震荡"),
@@ -78,6 +89,7 @@ enum class AiTrendType(val label: String) {
 }
 
 // AI 分析来源。
+@Serializable
 enum class AiAnalysisSource {
     MOCK,
     REMOTE,
@@ -85,6 +97,7 @@ enum class AiAnalysisSource {
 }
 
 // AI 分析的风险等级。
+@Serializable
 enum class AiRiskLevel(val label: String) {
     LOW("低风险"),
     MEDIUM("中风险"),
@@ -92,6 +105,7 @@ enum class AiRiskLevel(val label: String) {
 }
 
 // 条件式观察计划，不直接绑定交易操作。
+@Serializable
 data class AiObservationPlan(
     val focusRangeLow: Double,
     val focusRangeHigh: Double,
@@ -102,6 +116,7 @@ data class AiObservationPlan(
 )
 
 // 单条结构化信号及其数据依据。
+@Serializable
 data class AiSignal(
     val title: String,
     val status: String,
@@ -110,6 +125,7 @@ data class AiSignal(
 )
 
 // AI 分析保留旧字段，并通过默认值兼容现有调用方。
+@Serializable
 data class AiAnalysis(
     val trendJudgement: String,
     val focusPoint: String,

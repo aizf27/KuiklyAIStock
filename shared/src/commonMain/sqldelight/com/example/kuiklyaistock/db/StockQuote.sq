@@ -1,0 +1,37 @@
+CREATE TABLE StockQuote (
+  code TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  price REAL NOT NULL,
+  change REAL NOT NULL,
+  changePercent REAL NOT NULL,
+  open REAL NOT NULL,
+  previousClose REAL NOT NULL,
+  high REAL NOT NULL,
+  low REAL NOT NULL,
+  volume INTEGER NOT NULL,
+  turnover REAL NOT NULL,
+  turnoverRate REAL,
+  peRatio REAL,
+  updatedAt TEXT NOT NULL,
+  cachedAt INTEGER NOT NULL
+);
+
+-- 查询所有股票
+getAllQuotes:
+SELECT * FROM StockQuote;
+
+-- 根据 code 查询单只股票
+getQuoteByCode:
+SELECT * FROM StockQuote WHERE code = ?;
+
+-- 插入或替换股票快照
+insertOrReplaceQuote:
+INSERT OR REPLACE INTO StockQuote (
+  code, name, price, change, changePercent,
+  open, previousClose, high, low, volume,
+  turnover, turnoverRate, peRatio, updatedAt, cachedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- 删除所有股票（测试用）
+deleteAll:
+DELETE FROM StockQuote;

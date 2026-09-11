@@ -15,13 +15,15 @@ class TencentStockRepository internal constructor(
     private val transport: QuoteTransport,
     private val nowMillis: () -> Long,
     private val logger: (String) -> Unit,
+    private val databaseRepo: StockDatabaseRepository,
     private val cacheTtlMillis: Long = DEFAULT_CACHE_TTL_MILLIS,
 ) : StockRepository {
     constructor(
         pager: Pager,
         nowMillis: () -> Long = { 0L },
         logger: (String) -> Unit = {},
-    ) : this(TencentQuoteTransport(pager, nowMillis, logger), nowMillis, logger)
+        databaseRepo: StockDatabaseRepository,
+    ) : this(TencentQuoteTransport(pager, nowMillis, logger), nowMillis, logger, databaseRepo)
 
     private var latestQuotes: List<StockQuote> = emptyList()
 

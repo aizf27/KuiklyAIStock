@@ -1,0 +1,24 @@
+CREATE TABLE AiAnalysisCache (
+  code TEXT PRIMARY KEY NOT NULL,
+  content TEXT NOT NULL,
+  quoteTime TEXT NOT NULL,
+  analyzedAt INTEGER NOT NULL,
+  FOREIGN KEY(code) REFERENCES StockQuote(code) ON DELETE CASCADE
+);
+
+-- 查询某只股票的 AI 分析缓存
+getAiAnalysis:
+SELECT content, quoteTime, analyzedAt FROM AiAnalysisCache WHERE code = ?;
+
+-- 插入或替换 AI 分析缓存
+insertOrReplaceAiAnalysis:
+INSERT OR REPLACE INTO AiAnalysisCache (code, content, quoteTime, analyzedAt)
+VALUES (?, ?, ?, ?);
+
+-- 删除某只股票的 AI 分析缓存
+deleteByCode:
+DELETE FROM AiAnalysisCache WHERE code = ?;
+
+-- 删除所有 AI 分析缓存（测试用）
+deleteAll:
+DELETE FROM AiAnalysisCache;

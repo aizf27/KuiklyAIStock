@@ -1,0 +1,35 @@
+CREATE TABLE KLineData (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  period TEXT NOT NULL,
+  date TEXT NOT NULL,
+  open REAL NOT NULL,
+  close REAL NOT NULL,
+  high REAL NOT NULL,
+  low REAL NOT NULL,
+  volume REAL NOT NULL,
+  FOREIGN KEY(code) REFERENCES StockQuote(code) ON DELETE CASCADE,
+  UNIQUE(code, period, date)
+);
+
+CREATE INDEX idx_kline_code_period ON KLineData(code, period);
+
+-- 查询某只股票某周期的 K 线数据
+getKLines:
+SELECT date, open, close, high, low, volume
+FROM KLineData
+WHERE code = ? AND period = ?
+ORDER BY date ASC;
+
+-- 插入或替换 K 线数据
+insertOrReplaceKLine:
+INSERT OR REPLACE INTO KLineData (code, period, date, open, close, high, low, volume)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- 删除某只股票某周期的 K 线数据
+deleteByCodeAndPeriod:
+DELETE FROM KLineData WHERE code = ? AND period = ?;
+
+-- 删除所有 K 线数据（测试用）
+deleteAll:
+DELETE FROM KLineData;
