@@ -54,27 +54,48 @@ internal fun formatTimestamp(timestampMillis: Long): String {
     val hours = minutes / 60
     val days = hours / 24
 
-    // 简化的日期计算（从1970-01-01开始）
-    val year = 1970 + (days / 365).toInt()
-    val daysInYear = days % 365
+    // 从1970-01-01开始计算总天数
+    var totalDays = days.toInt()
+    var year = 1970
 
-    // 简化的月份计算（忽略闰年）
-    val monthDays = listOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    // 计算年份
+    while (true) {
+        val daysInYear = if (isLeapYear(year)) 366 else 365
+        if (totalDays >= daysInYear) {
+            totalDays -= daysInYear
+            year++
+        } else {
+            break
+        }
+    }
+
+    // 计算月份和日期
+    val monthDays = if (isLeapYear(year)) {
+        listOf(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    } else {
+        listOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    }
+
     var month = 1
-    var remainingDays = daysInYear.toInt()
+    var day = totalDays + 1
     for (i in monthDays.indices) {
-        if (remainingDays > monthDays[i]) {
-            remainingDays -= monthDays[i]
+        if (day > monthDays[i]) {
+            day -= monthDays[i]
             month++
         } else {
             break
         }
     }
-    val day = remainingDays + 1
+
     val hour = (hours % 24).toInt()
     val minute = (minutes % 60).toInt()
 
     return "${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
+}
+
+// 判断闰年
+private fun isLeapYear(year: Int): Boolean {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 
 private fun Int.padStart(length: Int, padChar: Char): String {
