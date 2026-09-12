@@ -72,7 +72,6 @@ internal class StockHomePage : BasePager() {
     private var searchQuoteResults by observableList<StockQuote>()
     private var favoriteQuoteResults by observableList<StockQuote>()
     internal var currentMinuteOfDay by observable(15 * 60)
-    internal var currentClockText by observable("--:--")
     internal var currentDateText by observable("")
     private var removePortfolioObserver: (() -> Unit)? = null
     private var draggingFavoriteCode = ""
@@ -248,10 +247,16 @@ internal class StockHomePage : BasePager() {
         val minute = timeParts.getOrNull(1)?.toIntOrNull()
         if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
             currentMinuteOfDay = hour * 60 + minute
-            currentClockText = timeText
         }
         // 资讯卡片只显示年月日，格式改为 yyyy-MM-dd
         bridge.dateFormatter(timestamp, "yyyy-MM-dd").takeIf { it.isNotEmpty() }?.let { currentDateText = it }
+    }
+
+    // 获取当前实时时间文本（HH:mm 格式）
+    internal fun getCurrentTimeText(): String {
+        val bridge = acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val timestamp = bridge.currentTimeStamp()
+        return if (timestamp > 0L) bridge.dateFormatter(timestamp, "HH:mm") else "--:--"
     }
 
     private fun scheduleMarketClockRefresh() {

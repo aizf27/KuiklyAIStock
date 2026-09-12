@@ -84,7 +84,7 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
                         quoteTime = page.quoteTime,
                         expired = page.quoteExpired,
                         missingCount = page.missingQuoteCodes.size,
-                        currentTimeText = page.currentClockText, // 传递实时时间
+                        currentTimeText = page.getCurrentTimeText(), // 动态获取实时时间
                     )
                     StockTimelyInformationCard(
                         width = page.stockContentWidth(),
