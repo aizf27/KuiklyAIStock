@@ -133,6 +133,24 @@ class AiAnalysisRepositoryTest {
     }
 
     @Test
+    fun keepsAvailableTrendSamplesWithoutMissingDataWarning() {
+        val snapshots = listOf(
+            detail,
+            detail.copy(dailyTrend = emptyList()),
+            detail.copy(intradayTrend = emptyList()),
+        )
+        snapshots.forEach { snapshot ->
+            val transport = FakeTransport(success(validJson()))
+            runImmediate { RemoteAiAnalysisRepository(transport, FakeStockDatabaseRepository()).loadAnalysis(snapshot) }
+
+            val prompt = transport.lastRequest?.userPrompt.orEmpty()
+            assertTrue(!prompt.contains("未提供真实分时或日 K 数据"))
+            assertEquals(snapshot.intradayTrend.isNotEmpty(), prompt.contains("分时样本="))
+            assertEquals(snapshot.dailyTrend.isNotEmpty(), prompt.contains("日K样本="))
+        }
+    }
+
+    @Test
     fun returnsUnsupportedWithoutStartingRequest() {
         val transport = FakeTransport(success(validJson()), supported = false)
 

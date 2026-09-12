@@ -47,7 +47,7 @@ private fun ViewContainer<*, *>.AiMarketOverviewCard(overview: AiMarketOverview)
         Text { attr { text("观点判断：${overview.sentiment}"); fontSize(13f); color(StockDesignTokens.secondaryText); marginTop(10f) } }
         Text { attr { text("事实摘要：${overview.summary}"); fontSize(14f); color(StockDesignTokens.primaryText); marginTop(6f) } }
         Text { attr { text("风险提示：${overview.riskTip}"); fontSize(13f); color(StockDesignTokens.risk); marginTop(10f) } }
-        Text { attr { text("数据截至 ${overview.updatedAt} · 行情快照"); fontSize(11f); color(StockDesignTokens.tertiaryText); marginTop(10f) } }
+       // Text { attr { text("数据截至 ${overview.updatedAt} · 行情快照"); fontSize(11f); color(StockDesignTokens.tertiaryText); marginTop(10f) } }
     }
 }
 

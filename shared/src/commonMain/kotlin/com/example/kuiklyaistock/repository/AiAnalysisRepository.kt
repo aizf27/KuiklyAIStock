@@ -191,6 +191,11 @@ internal class RemoteAiAnalysisRepository(
             appendLine("今开=${detail.open}，昨收=${detail.previousClose}，最高=${detail.high}，最低=${detail.low}")
             append("成交量=${detail.volume}，成交额=${detail.turnover}")
 
+            if (detail.intradayTrend.isEmpty() && detail.dailyTrend.isEmpty()) {
+                appendLine()
+                append("未提供真实分时或日 K 数据，仅依据行情快照分析。")
+            }
+
             // 只在有真实走势数据时才发送（避免发送大量 Mock 数据）
             if (detail.intradayTrend.isNotEmpty() && detail.intradayTrend.size < 100) {
                 appendLine()
