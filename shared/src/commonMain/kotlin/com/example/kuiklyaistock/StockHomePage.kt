@@ -250,7 +250,8 @@ internal class StockHomePage : BasePager() {
             currentMinuteOfDay = hour * 60 + minute
             currentClockText = timeText
         }
-        bridge.dateFormatter(timestamp, "MM-dd").takeIf { it.isNotEmpty() }?.let { currentDateText = it }
+        // 资讯卡片只显示年月日，格式改为 yyyy-MM-dd
+        bridge.dateFormatter(timestamp, "yyyy-MM-dd").takeIf { it.isNotEmpty() }?.let { currentDateText = it }
     }
 
     private fun scheduleMarketClockRefresh() {

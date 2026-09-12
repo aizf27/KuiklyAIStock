@@ -59,14 +59,15 @@ private fun stockMarketDataDescription(minuteOfDay: Int): String = when {
     else -> "当前展示最近一个交易时点快照"
 }
 
+// 行情时间直接使用实时时间，不再使用固定的 quoteTime
 private fun stockMarketDataTime(
-    quoteTime: String,
     sourceLabel: String,
     expired: Boolean,
     missingCount: Int,
+    currentTimeText: String,
 ): String = buildString {
     append("行情时间 ")
-    append(quoteTime.ifEmpty { "--" })
+    append(currentTimeText.ifEmpty { "--" })
     append(" · ")
     append(sourceLabel)
     if (expired) append("（已过期）")
@@ -82,6 +83,7 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
     quoteTime: String,
     expired: Boolean,
     missingCount: Int,
+    currentTimeText: String, // 实时时间
 ) {
     val session = stockMarketSession(minuteOfDay)
     val contentWidth = (width - StockDesignTokens.cardPadding * 2f).coerceAtLeast(0f)
@@ -203,7 +205,7 @@ internal fun ViewContainer<*, *>.StockMarketDashboard(
             }
             Text {
                 attr {
-                    text(stockMarketDataTime(quoteTime, sourceLabel, expired, missingCount))
+                    text(stockMarketDataTime(sourceLabel, expired, missingCount, currentTimeText))
                     fontSize(10f)
                     color(StockDesignTokens.tertiaryText)
                     marginTop(8f)

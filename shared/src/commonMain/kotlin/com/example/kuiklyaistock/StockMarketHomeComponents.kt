@@ -84,6 +84,7 @@ internal fun ViewContainer<*, *>.StockMarketHomeContent(page: StockHomePage) {
                         quoteTime = page.quoteTime,
                         expired = page.quoteExpired,
                         missingCount = page.missingQuoteCodes.size,
+                        currentTimeText = page.currentClockText, // 传递实时时间
                     )
                     StockTimelyInformationCard(
                         width = page.stockContentWidth(),
@@ -317,7 +318,8 @@ private fun ViewContainer<*, *>.StockTimelyInformationCard(
                 }
                 Text {
                     attr {
-                        text("${if (dateText.isEmpty()) "今日" else dateText}  ${information.publishTime}")
+                        // 只显示年月日，不显示时分
+                        text(dateText.ifEmpty { "今日" })
                         fontSize(10f)
                         color(StockDesignTokens.tertiaryText)
                         marginLeft(8f)
