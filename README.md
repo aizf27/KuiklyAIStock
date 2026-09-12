@@ -19,11 +19,11 @@
 
 | 行情首页 | 自选与持仓 | 个股详情 |
 | :---: | :---: | :---: |
-| ![行情首页](./ui_image/行情首页.jpg) | ![自选股和持仓股](./ui_image/自选股和持仓股.jpg) | ![个股详情](./ui_image/个股详情.jpg) |
+| [行情首页.jpg ](./ui_image/行情首页.jpg) | [自选股和持仓股.jpg](./ui_image/自选股和持仓股.jpg) | [个股详情.jpg](./ui_image/个股详情.jpg) |
 
 | AI 解读 Tab | 个股 AI 分析与预设问题 | 模拟交易弹窗 |
 | :---: | :---: | :---: |
-| ![AI解读Tab](./ui_image/AI解读Tab.jpg) | ![个股AI分析与预设问题](./ui_image/个股AI分析与预设问题.jpg) | ![模拟交易窗口](./ui_image/模拟交易窗口.jpg) |
+| [AI解读Tab.jpg](./ui_image/AI解读Tab.jpg) | [个股AI分析与预设问题.jpg](./ui_image/个股AI分析与预设问题.jpg) | [模拟交易窗口.jpg](./ui_image/模拟交易窗口.jpg) |
 
 
 
