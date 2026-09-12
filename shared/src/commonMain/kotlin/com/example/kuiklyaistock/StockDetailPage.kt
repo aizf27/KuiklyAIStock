@@ -89,7 +89,8 @@ internal class StockDetailPage : BasePager() {
         )
         aiRepository = RemoteAiAnalysisRepository(
             BridgeAiAnalysisTransport(bridge),
-            databaseRepo = databaseRepo
+            databaseRepo = databaseRepo,
+            getCurrentTime = { bridge.dateFormatter(bridge.currentTimeStamp(), "yyyy-MM-dd HH:mm:ss") }
         )
         removePortfolioObserver = PortfolioStore.subscribe { state ->
             favoriteCodes = state.favoriteCodes

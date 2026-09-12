@@ -135,6 +135,7 @@ internal class RemoteAiAnalysisRepository(
     private val modelName: String = DEFAULT_MODEL,
     private val schemaVersion: String = SCHEMA_VERSION,
     private val promptVersion: String = PROMPT_VERSION,
+    private val getCurrentTime: () -> String = { "" }, // 获取当前时间的回调
 ) : AiAnalysisRepository {
     override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult {
         if (!transport.isSupported()) return AiAnalysisLoadResult.Unsupported
@@ -181,23 +182,34 @@ internal class RemoteAiAnalysisRepository(
             "signals":[{"title":"文本","status":"文本","explanation":"文本","evidence":"文本"}],
             "riskLevel":"LOW|MEDIUM|HIGH","primaryRisks":["文本"],"invalidationCondition":"文本"}。
         """.trimIndent()
+
+        // 优化：只发送核心数据，减少 token 消耗
         val userPrompt = buildString {
             appendLine("请基于以下行情快照生成 JSON 分析：")
-            appendLine("名称=${detail.quote.name}，代码=${detail.quote.code}，行情时间=${detail.quote.updatedAt}")
+            appendLine("名称=${detail.quote.name}，代码=${detail.quote.code}")
             appendLine("当前价=${detail.quote.price}，涨跌=${detail.quote.change}，涨跌幅=${detail.quote.changePercent}%")
             appendLine("今开=${detail.open}，昨收=${detail.previousClose}，最高=${detail.high}，最低=${detail.low}")
             append("成交量=${detail.volume}，成交额=${detail.turnover}")
-            if (detail.intradayTrend.isNotEmpty()) {
+
+            // 只在有真实走势数据时才发送（避免发送大量 Mock 数据）
+            if (detail.intradayTrend.isNotEmpty() && detail.intradayTrend.size < 100) {
                 appendLine()
-                append("分时样本=${detail.intradayTrend.joinToString("；") { "${it.label}:${it.price}" }}")
+                // 采样：只取首、中、尾 10 个点，减少 token
+                val samples = if (detail.intradayTrend.size > 30) {
+                    detail.intradayTrend.take(10) +
+                    detail.intradayTrend.drop(detail.intradayTrend.size / 2 - 5).take(10) +
+                    detail.intradayTrend.takeLast(10)
+                } else {
+                    detail.intradayTrend
+                }
+                append("分时样本=${samples.joinToString("；") { "${it.label}:${it.price}" }}")
             }
-            if (detail.dailyTrend.isNotEmpty()) {
+
+            if (detail.dailyTrend.isNotEmpty() && detail.dailyTrend.size < 50) {
                 appendLine()
-                append("日K样本=${detail.dailyTrend.joinToString("；") { "${it.label}:${it.price}" }}")
-            }
-            if (detail.intradayTrend.isEmpty() && detail.dailyTrend.isEmpty()) {
-                appendLine()
-                append("本次未提供真实分时或日 K 数据，不得推断时序走势。")
+                // 日 K 只取最近 10 条
+                val samples = detail.dailyTrend.takeLast(10)
+                append("日K样本=${samples.joinToString("；") { "${it.label}:${it.price}" }}")
             }
         }
         return AiAnalysisRequest(detail.quote.code, modelName, systemPrompt, userPrompt)
@@ -234,7 +246,7 @@ internal class RemoteAiAnalysisRepository(
                     factSummary = factSummary,
                     applicablePeriod = applicablePeriod,
                     evidenceSummary = evidenceSummary,
-                    updatedAt = detail.quote.updatedAt,
+                    updatedAt = getCurrentTime().ifBlank { detail.quote.updatedAt }, // 使用实时时间
                     isDemo = false,
                     trendType = trendType,
                     riskLevel = riskLevel,
