@@ -8,28 +8,36 @@ import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
+/**
+ * BridgeModule 提供 JS 层调用原生能力的桥接接口
+ * 包括页面跳转、网络请求、数据缓存、AI 服务等核心功能
+ */
 internal class BridgeModule : Module() {
 
     override fun moduleName(): String {
         return MODULE_NAME
     }
 
+    // 关闭当前页面
     fun closePage() {
         callNativeMethod(CLOSE_PAGE, null, null)
     }
 
+    // 输出日志到原生端，用于调试
     fun log(content: String) {
         val methodArgs = JSONObject()
         methodArgs.put("content", content)
         callNativeMethod(LOG, methodArgs, null)
     }
 
+    // 复制文本到系统剪贴板
     fun copyToPasteboard(content: String) {
         val methodArgs = JSONObject()
         methodArgs.put("content", content)
         callNativeMethod("copyToPasteboard", methodArgs, null)
     }
 
+    // 显示原生弹窗，支持自定义标题、消息和按钮
     fun showAlert(
         title: String?,
         message: String?,
@@ -65,12 +73,14 @@ internal class BridgeModule : Module() {
         callNativeMethod("callPhone", methodArgs, null)
     }
 
+    // 显示 Toast 提示
     fun toast(content: String) {
         val methodArgs = JSONObject()
         methodArgs.put("content", content)
         callNativeMethod("toast", methodArgs, null)
     }
 
+    // 打开新页面，支持关闭当前页面和传递参数
     fun openPage(
         url: String,
         closeCurPage: Boolean = false,
@@ -88,6 +98,7 @@ internal class BridgeModule : Module() {
         callNativeMethod(OPEN_PAGE, methodArgs, callbackFn)
     }
 
+    // 发起 SSO 网络请求（协程版本）
     suspend fun ssoRequest(cmd: String, reqParams: JSONObject): JSONObject? {
         return suspendCoroutine<JSONObject?> { continuation ->
             ssoRequest(cmd, reqParams) {
@@ -96,6 +107,7 @@ internal class BridgeModule : Module() {
         }
     }
 
+    // 发起 SSO 网络请求（回调版本）
     fun ssoRequest(cmd: String, reqParams: JSONObject, responseCallbackFn: CallbackFn) {
         val methodArgs = JSONObject()
         methodArgs.put("cmd", cmd)
@@ -182,7 +194,7 @@ internal class BridgeModule : Module() {
         callNativeMethod(LOCAL_SERVE_TIME, null, cb)
     }
 
-    //同步获取本地服务器时间戳
+    // 同步获取本地服务器时间戳（协程版本）
     suspend fun localServeTime(): JSONObject? {
         return suspendCoroutine<JSONObject?> { continuation ->
             localServeTime() {
@@ -191,8 +203,7 @@ internal class BridgeModule : Module() {
         }
     }
 
-    // 同步获取时间戳（毫秒）
-    // 注：一般不用于业务，仅为本地性能耗时测试
+    // 同步获取当前时间戳（毫秒），仅用于性能测试
     fun currentTimeStamp(): Long {
         val timestamp = syncCallNativeMethod(CURRENT_TIMESTAMP, null, null)
         if (timestamp.isNotEmpty()) {
@@ -202,7 +213,7 @@ internal class BridgeModule : Module() {
         }
     }
 
-    // 同步获取日期格式化
+    // 同步获取格式化后的日期字符串
     fun dateFormatter(timeStamp: Long, format: String): String {
         val params = JSONObject()
         params.put("timeStamp", timeStamp)
@@ -210,9 +221,7 @@ internal class BridgeModule : Module() {
         return syncCallNativeMethod(DATE_FORMATTER, params, null)
     }
 
-    /**
-     * 根据 [key] 获取本地缓存的数据, 异步返回
-     */
+    // 异步从原生端读取缓存数据
     fun fetchCachedFromNative(key: String, callbackFn: CallbackFn) {
         val param = JSONObject().apply {
             put("key", key)
@@ -222,9 +231,7 @@ internal class BridgeModule : Module() {
         }
     }
 
-    /**
-     * 根据 [key] 获取本地缓存的数据, 同步返回
-     */
+    // 同步从原生端读取缓存数据
     fun getCachedFromNative(key: String): String {
         val param = JSONObject().apply {
             put("key", key)
@@ -232,9 +239,7 @@ internal class BridgeModule : Module() {
         return syncCallNativeMethod("getCachedFromNative", param, null)
     }
 
-    /**
-     * 向 native 写入 [key] 对应的缓存
-     */
+    // 向原生端写入缓存数据
     fun setCachedToNative(key: String, value: String, callbackFn: CallbackFn? = null) {
         val param = JSONObject().apply {
             put("key", key)
@@ -293,21 +298,25 @@ internal class BridgeModule : Module() {
         return syncCallNativeMethod(HUMAN_VERIFICATION, params, callbackFn)
     }
 
+    // URL 编码
     fun urlEncode(string: String): String {
         val params = JSONObject()
         params.put("string", string)
         return syncCallNativeMethod(URL_ENCODE, params, null)
     }
 
+    // URL 解码
     fun urlDecode(string: String): String {
         val params = JSONObject()
         params.put("string", string)
         return syncCallNativeMethod(URL_DECODE, params, null)
     }
 
+    // 判断原生端是否支持 AI 分析服务
     fun supportsAiAnalysis(): Boolean =
         syncCallNativeMethod(SUPPORTS_AI_ANALYSIS, null, null) == "1"
 
+    // 向原生端请求 AI 分析（协程版本）
     suspend fun requestAiAnalysis(request: JSONObject): JSONObject? =
         suspendCoroutine { continuation ->
             callNativeMethod(REQUEST_AI_ANALYSIS, request) { response ->
@@ -315,6 +324,7 @@ internal class BridgeModule : Module() {
             }
         }
 
+    // 异步调用原生方法
     private fun callNativeMethod(methodName: String, data: JSONObject?, callbackFn: CallbackFn?) {
         toNative(
             false,
@@ -325,7 +335,7 @@ internal class BridgeModule : Module() {
         )
     }
 
-    // --------- 同步调用Native方法 -------
+    // 同步调用原生方法
     private fun syncCallNativeMethod(
         methodName: String,
         data: JSONObject?,

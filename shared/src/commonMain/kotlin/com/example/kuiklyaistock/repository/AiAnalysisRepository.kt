@@ -11,23 +11,36 @@ import com.example.kuiklyaistock.model.StockDetail
 import com.tencent.kuikly.core.nvi.serialization.json.JSONArray
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 
+/**
+ * AI分析错误类型
+ */
 internal enum class AiAnalysisErrorType {
-    CONFIG,
-    AUTH,
-    BALANCE,
-    RATE_LIMIT,
-    INVALID_REQUEST,
-    SERVER,
-    NETWORK,
-    FORMAT,
+    CONFIG,          // 未配置AI服务
+    AUTH,            // 鉴权失败
+    BALANCE,         // 额度不足
+    RATE_LIMIT,      // 请求频率超限
+    INVALID_REQUEST, // 请求参数无效
+    SERVER,          // 服务端错误
+    NETWORK,         // 网络连接失败
+    FORMAT,          // 返回格式异常
 }
 
+/**
+ * AI分析加载结果
+ */
 internal sealed class AiAnalysisLoadResult {
     data class Success(val analysis: AiAnalysis) : AiAnalysisLoadResult()
     data class Failure(val type: AiAnalysisErrorType, val message: String) : AiAnalysisLoadResult()
-    data object Unsupported : AiAnalysisLoadResult()
+    data object Unsupported : AiAnalysisLoadResult() // 当前环境不支持AI服务
 }
 
+/**
+ * AI分析请求参数
+ * @param stockCode 股票代码
+ * @param modelName AI模型名称，如"deepseek-flash"
+ * @param systemPrompt 系统提示词，定义输出格式和约束
+ * @param userPrompt 用户提示词，包含行情数据
+ */
 internal data class AiAnalysisRequest(
     val stockCode: String,
     val modelName: String,
@@ -35,35 +48,54 @@ internal data class AiAnalysisRequest(
     val userPrompt: String,
 )
 
+/**
+ * AI服务传输层返回结果
+ */
 internal sealed class AiTransportResult {
     data class Success(
-        val content: String,
-        val modelName: String,
-        val requestId: String,
-        val generatedAt: String,
+        val content: String,      // AI返回的JSON内容
+        val modelName: String,    // 实际使用的模型名
+        val requestId: String,    // 请求ID，用于追踪
+        val generatedAt: String,  // 生成时间
     ) : AiTransportResult()
 
     data class Failure(
-        val statusCode: Int,
-        val errorType: String,
-        val message: String,
+        val statusCode: Int,      // HTTP状态码
+        val errorType: String,    // 错误类型标识
+        val message: String,      // 错误描述
     ) : AiTransportResult()
 }
 
+/**
+ * AI服务传输层接口，支持不同的传输实现
+ */
 internal interface AiAnalysisTransport {
+    // 判断当前环境是否支持AI服务
     fun isSupported(): Boolean
+
+    // 发起AI分析请求
     suspend fun request(request: AiAnalysisRequest): AiTransportResult
 }
 
+/**
+ * AI分析仓储接口
+ */
 internal interface AiAnalysisRepository {
+    // 加载指定股票的AI分析，优先使用缓存，缓存过期则请求远程
     suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult
 }
 
+/**
+ * Mock实现，返回本地模拟的AI分析数据
+ */
 internal class MockAiAnalysisRepository : AiAnalysisRepository {
     override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult =
         AiAnalysisLoadResult.Success(createMockAiAnalysis(detail))
 }
 
+/**
+ * 通过Kuikly Bridge调用原生端AI服务的传输层实现
+ */
 internal class BridgeAiAnalysisTransport(
     private val bridgeModule: BridgeModule,
 ) : AiAnalysisTransport {
@@ -94,6 +126,9 @@ internal class BridgeAiAnalysisTransport(
     }
 }
 
+/**
+ * 远程AI分析仓储实现，支持缓存和网络请求
+ */
 internal class RemoteAiAnalysisRepository(
     private val transport: AiAnalysisTransport,
     private val databaseRepo: StockDatabaseRepository,
@@ -104,19 +139,19 @@ internal class RemoteAiAnalysisRepository(
     override suspend fun loadAnalysis(detail: StockDetail): AiAnalysisLoadResult {
         if (!transport.isSupported()) return AiAnalysisLoadResult.Unsupported
 
-        // 1. 优先从数据库读取
+        // 1. 优先从数据库读取缓存
         val cached = databaseRepo.getAiAnalysis(detail.quote.code)
         if (cached != null && cached.quoteTime == detail.quote.updatedAt) {
             return AiAnalysisLoadResult.Success(cached.analysis.copy(source = AiAnalysisSource.CACHE))
         }
 
-        // 2. 发起网络请求
+        // 2. 缓存失效，发起网络请求
         val request = buildRequest(detail)
         return when (val result = transport.request(request)) {
             is AiTransportResult.Success -> {
                 val parsed = parseRemoteAnalysis(detail, result)
                 if (parsed is AiAnalysisLoadResult.Success) {
-                    // 写入数据库
+                    // 写入数据库缓存
                     databaseRepo.insertAiAnalysis(
                         detail.quote.code,
                         parsed.analysis,
@@ -132,6 +167,7 @@ internal class RemoteAiAnalysisRepository(
         }
     }
 
+    // 构建AI请求，包含系统提示词和用户提示词
     private fun buildRequest(detail: StockDetail): AiAnalysisRequest {
         val systemPrompt = """
             你是股票行情产品的结构化分析助手。必须只输出合法 JSON 对象，不要 Markdown、代码块或额外说明。
