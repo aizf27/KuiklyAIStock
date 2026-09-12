@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./ui_image/应用图标.png" alt="KuiklyAIStock" width="120"/>
+  <img src="./ui_image/app_icon.svg" alt="KuiklyAIStock" width="120"/>
   <h1>KuiklyAIStock</h1>
 </div>
 
