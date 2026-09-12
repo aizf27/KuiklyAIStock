@@ -1,4 +1,17 @@
 pluginManagement {
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+            maven {
+                url = uri("https://mirrors.tencent.com/nexus/repository/maven-tencent/")
+            }
+        }
+        dependencies {
+            // 兼容 Kotlin 2.1，替换 AGP 7.4.2 内置的旧版 D8/R8。
+            classpath("com.android.tools:r8:8.6.17")
+        }
+    }
     repositories {
         google()
         gradlePluginPortal()
