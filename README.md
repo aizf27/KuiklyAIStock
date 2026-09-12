@@ -1,4 +1,7 @@
-# KuiklyAIStock
+<div align="center">
+  <img src="./ui_image/应用图标.png" alt="KuiklyAIStock" width="120"/>
+  <h1>KuiklyAIStock</h1>
+</div>
 
 基于 **Kuikly + Kotlin Multiplatform** 开发的股票行情与 AI 解读 Demo，将行情浏览、自选管理、模拟持仓和个股分析串联在同一套 Kotlin 页面中。
 
